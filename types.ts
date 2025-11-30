@@ -38,6 +38,32 @@ export interface ListData {
     tasks: string[];
 }
 
-export type TabId = 'general' | 'quran' | 'class1' | 'class2' | 'notes' | 'reports' | 'about';
+export type TabId = 'general' | 'quran' | 'class1' | 'class2' | 'notes' | 'dashboard' | 'reports' | 'about';
 
 export type CompletionStatus = 'complete' | 'partial' | 'incomplete';
+
+// Dashboard Statistics Types
+export interface LessonWithMonth {
+  level: string;
+  subject: string;
+  lesson: string;
+  gender?: string;
+  expectedMonth: number; // 1-12
+}
+
+export interface SubjectProgress {
+  subject: string;
+  level: string;
+  completed: number;
+  total: number;
+  percentage: number;
+  overdue: number;
+}
+
+export interface TeacherStats {
+  totalCompleted: number;
+  totalExpected: number;
+  overallPercentage: number;
+  subjectProgress: SubjectProgress[];
+  totalOverdue: number;
+}

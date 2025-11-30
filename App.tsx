@@ -6,6 +6,7 @@ import { BottomNav } from './components/BottomNav';
 import { CheckboxGrid } from './components/CheckboxGrid';
 import { ProgressStepper } from './components/ProgressStepper';
 import { AboutProject } from './components/AboutProject';
+import { Dashboard } from './Dashboard';
 import { MOCK_DATA } from './constants';
 import { ReportData, TabId, ClassData, CompletionStatus, ListData } from './types';
 import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, TrendingUp, Award, AlertCircle, WifiOff } from 'lucide-react';
@@ -425,6 +426,7 @@ export default function App() {
         class1: getClassStatus(report.firstClass),
         class2: getClassStatus(report.secondClass),
         notes: getNotesStatus(),
+        dashboard: 'complete',
         reports: getReportsStatus(),
         about: 'complete'
     };
@@ -441,6 +443,7 @@ export default function App() {
         }
 
         steps.push({ id: 'notes' as TabId, label: 'ملاحظات', status: tabStatusMap.notes });
+        steps.push({ id: 'dashboard' as TabId, label: 'إحصائيات', status: tabStatusMap.dashboard });
         steps.push({ id: 'reports' as TabId, label: 'تقارير', status: tabStatusMap.reports });
 
         return steps;
@@ -905,6 +908,7 @@ export default function App() {
                 {activeTab === 'class1' && renderClassInfo('firstClass')}
                 {activeTab === 'class2' && renderClassInfo('secondClass')}
                 {activeTab === 'notes' && renderNotes()}
+                {activeTab === 'dashboard' && <Dashboard teacherName={report.general.name} />}
                 {activeTab === 'reports' && renderReports()}
                 {activeTab === 'about' && <AboutProject />}
             </main>

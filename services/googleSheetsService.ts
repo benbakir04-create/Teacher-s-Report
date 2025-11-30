@@ -218,6 +218,36 @@ export async function readLessons() {
 }
 
 /**
+ * قراءة دروس مع الشهر المفترض كمصفوفة (للإحصائيات)
+ * الهيكل: المستوى | المادة | الدرس | الجنس | الشهر المفترض
+ */
+export async function readLessonsWithMonths() {
+  try {
+    const values = await readSheetRangeWithFallback('الدروس!A2:E', 'Lessons!A2:E');
+    
+    const lessons: any[] = [];
+    
+    values.forEach(row => {
+      const [level, subject, lesson, gender, month] = row;
+      if (level && subject && lesson) {
+        lessons.push({
+          level: level.toString().trim(),
+          subject: subject.toString().trim(),
+          lesson: lesson.toString().trim(),
+          gender: gender ? gender.toString().trim() : undefined,
+          expectedMonth: month ? parseInt(month.toString()) : 0
+        });
+      }
+    });
+    
+    return lessons;
+  } catch (error) {
+    console.error('Error reading lessons with months:', error);
+    return [];
+  }
+}
+
+/**
  * تحميل جميع البيانات من Google Sheets
  */
 export async function loadAllData() {
