@@ -1,0 +1,5 @@
+{
+  "name": "Teacher Report App",
+  "description": "A progressive web app for teachers to submit daily class reports, manage student progress, and generate AI summaries.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,354 @@
+// ========== Code.gs المحدث ==========
+
+function doGet() {
+  return HtmlService
+    .createHtmlOutputFromFile('form')
+    .setTitle('تقرير الحصة')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * يعيد كائن يحتوي:
+ *  - lists: { schools, levels, sections, strategies, tools, tasks }
+ *  - lessons: [ { level, subjectOriginal, subjectNorm, title, gender } ]
+ */
+function getFormData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // التحقق من وجود الأوراق المطلوبة
+    ensureRequiredSheets(ss);
+    
+    return {
+      lists: readLists(ss),
+      lessons: readLessons(ss)
+    };
+  } catch (error) {
+    logError(error, 'getFormData');
+    throw new Error(`خطأ في تحميل البيانات: ${error.message}`);
+  }
+}
+
+/**
+ * التأكد من وجود الأوراق المطلوبة
+ */
+function ensureRequiredSheets(ss) {
+  const requiredSheets = ['القوائم', 'الدروس', 'التقارير'];
+  
+  requiredSheets.forEach(sheetName => {
+    if (!ss.getSheetByName(sheetName)) {
+      const newSheet = ss.insertSheet(sheetName);
+      
+      // إضافة رؤوس أعمدة افتراضية حسب نوع الورقة
+      if (sheetName === 'القوائم') {
+        newSheet.getRange('A1:F1').setValues([['المدارس', 'المستويات', 'معرف القسم', 'استراتيجية التدريس', 'الوسائل التعليمية', 'المهام المنجزة']]);
+      } else if (sheetName === 'الدروس') {
+        newSheet.getRange('A1:D1').setValues([['المستوى', 'المادة', 'الدرس', 'الجنس']]);
+      } else if (sheetName === 'التقارير') {
+        addReportsHeaders(newSheet);
+      }
+    }
+  });
+}
+
+/**
+ * إضافة رؤوس أعمدة ورقة التقارير
+ */
+function addReportsHeaders(sheet) {
+  const headers = [
+    'المدرسة', 'المعلم', 'التاريخ', 'تقرير القرآن', 'المستوى', 
+    'القسم', 'المادة الأولى', 'الدرس الأول', 'استراتيجية الأولى',
+    'وسائل الأولى', 'مهام الأولى', 'حصة ثانية؟', 'المادة الثانية',
+    'الدرس الثاني', 'استراتيجية الثانية', 'وسائل الثانية', 
+    'مهام الثانية', 'الملاحظات', 'تاريخ الحفظ'
+  ];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+/**
+ * قراءة القوائم من ورقة "القوائم".
+ */
+function readLists(ss) {
+  try {
+    const sh = ss.getSheetByName('القوائم');
+    if (!sh) throw new Error('لم يتم العثور على ورقة "القوائم"');
+
+    const vals = sh.getDataRange().getValues();
+    if (!vals || vals.length === 0) {
+      return getDefaultLists();
+    }
+
+    const rawHeaders = vals[0].map(h => (h || '').toString().trim());
+    const lists = { schools:[], levels:[], sections:[], strategies:[], tools:[], tasks:[] };
+
+    // تحسين دالة تعيين الأعمدة
+    const columnMappings = {
+      'schools': ['المدارس', 'المدرسة', 'School', 'schools'],
+      'levels': ['المستوى', 'المستويات', 'level', 'levels'],
+      'sections': ['معرف القسم', 'القسم', 'معرف_القسم', 'section', 'sections'],
+      'strategies': ['استراتيجية التدريس', 'استراتيجيات التدريس', 'استراتيجية', 'strategy', 'strategies'],
+      'tools': ['الوسائل التعليمية', 'الوسائل التعليمية المستعملة', 'وسائل تعليمية', 'tools'],
+      'tasks': ['المهام المنجزة', 'الأعمال المنجزة', 'المهام', 'tasks']
+    };
+
+    function headerToKey(h) {
+      if (!h) return null;
+      const normalizedHeader = h.trim();
+      
+      for (const [key, variants] of Object.entries(columnMappings)) {
+        if (variants.some(variant => variant === normalizedHeader)) {
+          return key;
+        }
+      }
+      return null;
+    }
+
+    // تعبئة الحقول من الأعمدة المطابقة
+    for (let c = 0; c < rawHeaders.length; c++) {
+      const key = headerToKey(rawHeaders[c]);
+      if (!key) continue;
+      
+      const colVals = vals.slice(1)
+        .map(r => (r[c] || '').toString().trim())
+        .filter(val => val.length > 0);
+      
+      lists[key] = Array.from(new Set(colVals));
+    }
+
+    // التأكد من أن كل قائمة تحتوي على بيانات، وإلا استخدم البيانات الافتراضية
+    const defaultLists = getDefaultLists();
+    Object.keys(lists).forEach(key => {
+      if (lists[key].length === 0 && defaultLists[key]) {
+        lists[key] = defaultLists[key];
+      }
+    });
+
+    return lists;
+  } catch (error) {
+    logError(error, 'readLists');
+    return getDefaultLists();
+  }
+}
+
+/**
+ * القوائم الافتراضية في حالة عدم وجود بيانات
+ */
+function getDefaultLists() {
+  return {
+    schools: ['مدرسة الأمل الابتدائية', 'مدرسة النور المتوسطة', 'ثانوية المستقبل'],
+    levels: ['الأولى ابتدائي', 'الثانية ابتدائي', 'الثالثة ابتدائي', 'الرابعة ابتدائي', 
+             'الخامسة ابتدائي', 'الأولى متوسط', 'الثانية متوسط', 'الثالثة متوسط', 
+             'الرابعة متوسط', 'الأولى ثانوي', 'الثانية ثانوي', 'الثالثة ثانوي'],
+    sections: ['أ', 'ب', 'ج', 'د', 'هـ'],
+    strategies: ['العصف الذهني', 'التعلم التعاوني', 'حل المشكلات', 'التعلم النشط', 'المناقشة والحوار'],
+    tools: ['السبورة الذكية', 'العروض التقديمية', 'الكتاب المدرسي', 'الخرائط الذهنية', 'الوسائل السمعية البصرية'],
+    tasks: ['شرح الدرس', 'حل التمارين', 'النشاط الجماعي', 'التقويم التكويني', 'الواجبات المنزلية']
+  };
+}
+
+/**
+ * قراءة الدروس من ورقة "الدروس".
+ */
+function readLessons(ss) {
+  try {
+    const lessonsSh = ss.getSheetByName('الدروس');
+    if (!lessonsSh) throw new Error('لم يتم العثور على ورقة "الدروس"');
+
+    const vals = lessonsSh.getDataRange().getValues();
+    if (!vals || vals.length < 2) {
+      return getDefaultLessons();
+    }
+
+    const headers = vals[0].map(h => (h||'').toString().trim());
+
+    // البحث عن الأعمدة المطلوبة
+    const columnMappings = {
+      level: ['المستوى', 'level'],
+      subject: ['المادة', 'الموضوع', 'subject'],
+      title: ['الدرس', 'العنوان', 'title'],
+      gender: ['الجنس', 'gender']
+    };
+
+    const columnIndices = {};
+    Object.entries(columnMappings).forEach(([key, variants]) => {
+      const index = headers.findIndex(h => variants.includes(h));
+      columnIndices[key] = index;
+    });
+
+    // التأكد من وجود الأعمدة الأساسية
+    if (columnIndices.level < 0 || columnIndices.subject < 0 || columnIndices.title < 0) {
+      throw new Error('ورقة "الدروس" يجب أن تحتوي على أعمدة: المستوى، المادة، الدرس');
+    }
+
+    // إذا لم يوجد عمود الجنس، استخدم العمود السادس (index 5) كما في الكود الأصلي
+    if (columnIndices.gender < 0 && vals[0].length >= 6) {
+      columnIndices.gender = 5;
+    }
+
+    function normalizeSubject(s) {
+      if (!s) return '';
+      return s.toString().trim().replace(/^\s*ال\s*/, '').toLowerCase();
+    }
+
+    const lessons = vals.slice(1).map(row => {
+      const subjOrig = (row[columnIndices.subject] || '').toString().trim();
+      return {
+        level: (row[columnIndices.level] || '').toString().trim(),
+        subjectOriginal: subjOrig,
+        subjectNorm: normalizeSubject(subjOrig),
+        title: (row[columnIndices.title] || '').toString().trim(),
+        gender: (columnIndices.gender >= 0 && row[columnIndices.gender] 
+                 ? row[columnIndices.gender].toString().trim() : '')
+      };
+    }).filter(x => x.level && x.subjectOriginal && x.title);
+
+    return lessons.length > 0 ? lessons : getDefaultLessons();
+  } catch (error) {
+    logError(error, 'readLessons');
+    return getDefaultLessons();
+  }
+}
+
+/**
+ * الدروس الافتراضية في حالة عدم وجود بيانات
+ */
+function getDefaultLessons() {
+  return [
+    { level: 'الأولى ابتدائي', subjectOriginal: 'الرياضيات', subjectNorm: 'رياضيات', title: 'الأعداد من 1 إلى 10', gender: '' },
+    { level: 'الأولى ابتدائي', subjectOriginal: 'اللغة العربية', subjectNorm: 'لغة عربية', title: 'حروف الهجاء', gender: '' },
+    { level: 'الثانية ابتدائي', subjectOriginal: 'الرياضيات', subjectNorm: 'رياضيات', title: 'الجمع والطرح', gender: '' },
+    { level: 'الثالثة ابتدائي', subjectOriginal: 'التربية الإسلامية', subjectNorm: 'تربية إسلامية', title: 'الوضوء', gender: '' },
+    { level: 'الرابعة متوسط', subjectOriginal: 'الفقه', subjectNorm: 'فقه', title: 'أحكام الطهارة للبنات', gender: 'إناث' },
+    { level: 'الرابعة متوسط', subjectOriginal: 'الفقه', subjectNorm: 'فقه', title: 'أحكام الصلاة للبنين', gender: 'ذكور' }
+  ];
+}
+
+/**
+ * حفظ البيانات في ورقة التقارير
+ */
+function submitForm(payload) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sh = ss.getSheetByName('التقارير');
+    
+    // إنشاء الورقة إذا لم تكن موجودة
+    if (!sh) {
+      sh = ss.insertSheet('التقارير');
+      addReportsHeaders(sh);
+    }
+    
+    // إضافة رؤوس الأعمدة إذا كانت الورقة فارغة
+    if (sh.getLastRow() === 0) {
+      addReportsHeaders(sh);
+    }
+
+    // إنشاء النسخة الاحتياطية
+    backupData(payload);
+
+    const row = [
+      payload.school || '',
+      payload.teacher || '',
+      payload.date || '',
+      payload.quranReport || '',
+      payload.level || '',
+      payload.section || '',
+      payload.subject1 || '',
+      payload.lesson1 || '',
+      payload.strategy1 || '',
+      payload.tools1 || '',
+      payload.tasks1 || '',
+      payload.hasSecond || '',
+      payload.subject2 || '',
+      payload.lesson2 || '',
+      payload.strategy2 || '',
+      payload.tools2 || '',
+      payload.tasks2 || '',
+      payload.notes || '',
+      new Date() // تاريخ الحفظ
+    ];
+
+    sh.appendRow(row);
+    
+    return 'تم حفظ التقرير بنجاح ✅';
+  } catch (error) {
+    logError(error, 'submitForm');
+    throw new Error(`فشل في حفظ التقرير: ${error.message}`);
+  }
+}
+
+/**
+ * إنشاء نسخة احتياطية من البيانات
+ */
+function backupData(payload) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let backupSheet = ss.getSheetByName('النسخ الاحتياطية');
+    
+    if (!backupSheet) {
+      backupSheet = ss.insertSheet('النسخ الاحتياطية');
+      backupSheet.getRange('A1:B1').setValues([['تاريخ النسخ', 'البيانات']]);
+    }
+    
+    const timestamp = new Date();
+    const backupRow = [timestamp, JSON.stringify(payload)];
+    backupSheet.appendRow(backupRow);
+    
+    // حذف النسخ الاحتياطية الأقدم من 30 يوم للحفاظ على الأداء
+    cleanOldBackups(backupSheet);
+  } catch (error) {
+    logError(error, 'backupData');
+    // لا نريد أن يفشل الحفظ بسبب فشل النسخ الاحتياطي
+  }
+}
+
+/**
+ * تنظيف النسخ الاحتياطية القديمة
+ */
+function cleanOldBackups(backupSheet) {
+  try {
+    const data = backupSheet.getDataRange().getValues();
+    if (data.length <= 1) return; // فقط رؤوس الأعمدة
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    let rowsToDelete = [];
+    for (let i = 1; i < data.length; i++) { // بدء من الصف الثاني (تجاهل رؤوس الأعمدة)
+      const date = new Date(data[i][0]);
+      if (date < thirtyDaysAgo) {
+        rowsToDelete.push(i + 1); // +1 لأن الفهرسة تبدأ من 1 في Google Sheets
+      }
+    }
+    
+    // حذف الصفوف من الأسفل للأعلى لتجنب تغيير فهارس الصفوف
+    rowsToDelete.reverse().forEach(rowIndex => {
+      backupSheet.deleteRow(rowIndex);
+    });
+  } catch (error) {
+    logError(error, 'cleanOldBackups');
+  }
+}
+
+/**
+ * تسجيل الأخطاء
+ */
+function logError(error, context) {
+  console.error(`Error in ${context}:`, error);
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let errorSheet = ss.getSheetByName('سجل الأخطاء');
+    
+    if (!errorSheet) {
+      errorSheet = ss.insertSheet('سجل الأخطاء');
+      errorSheet.getRange('A1:C1').setValues([['التاريخ', 'السياق', 'رسالة الخطأ']]);
+    }
+    
+    const timestamp = new Date();
+    const errorRow = [timestamp, context, error.toString()];
+    errorSheet.appendRow(errorRow);
+    
+  } catch (loggingError) {
+    console.error('Failed to log error:', loggingError);
+  }
+}
