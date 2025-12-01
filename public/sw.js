@@ -1,4 +1,4 @@
-const CACHE_NAME = "teacher-report-app-v1";
+const CACHE_NAME = "teacher-report-app-v2";
 const urlsToCache = [
   "/",
   "/index.html",
