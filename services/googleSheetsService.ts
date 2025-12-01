@@ -228,7 +228,7 @@ export async function readLessonsWithMonths() {
     const lessons: any[] = [];
     
     values.forEach(row => {
-      const [level, subject, lesson, gender, month] = row;
+      const [level, subject, gender, lesson, month] = row;
       if (level && subject && lesson) {
         lessons.push({
           level: level.toString().trim(),
