@@ -106,6 +106,7 @@ export default function App() {
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [dateInputType, setDateInputType] = useState<'text' | 'date'>('text');
+    const [userImage, setUserImage] = useState<string | null>(null);
     
     // Accordion State for Class Tabs
     const [openAccordion, setOpenAccordion] = useState<string | null>('strategies');
@@ -196,6 +197,15 @@ export default function App() {
         if (isOnline()) {
             syncPendingReports();
         }
+        if (isOnline()) {
+            syncPendingReports();
+        }
+
+        // Load User Image
+        const savedImage = localStorage.getItem('user_profile_image');
+        if (savedImage) {
+            setUserImage(savedImage);
+        }
     }, []);
 
     // Reset accordion state when switching tabs
@@ -275,6 +285,18 @@ export default function App() {
             .then(url => setQrDataUrl(url))
             .catch(err => console.error(err));
     }, [report.general]);
+
+
+
+    const handleImageUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            setUserImage(base64String);
+            localStorage.setItem('user_profile_image', base64String);
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleGeneralChange = (field: keyof typeof report.general, value: string) => {
         setReport(prev => ({
@@ -891,7 +913,9 @@ export default function App() {
             <div className="bg-gradient-to-bl from-[#667eea] to-[#764ba2] rounded-b-[30px] shadow-lg mb-4">
                 <Header 
                     teacherName={report.general.name} 
+                    userImage={userImage}
                     onQrClick={() => setIsQrModalOpen(true)}
+                    onImageUpload={handleImageUpload}
                 />
                 <ProgressStepper 
                     steps={getSteps()} 
