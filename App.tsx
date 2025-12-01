@@ -427,7 +427,6 @@ export default function App() {
         class2: getClassStatus(report.secondClass),
         notes: getNotesStatus(),
         dashboard: 'complete',
-        reports: getReportsStatus(),
         about: 'complete'
     };
 
@@ -444,7 +443,6 @@ export default function App() {
 
         steps.push({ id: 'notes' as TabId, label: 'ملاحظات', status: tabStatusMap.notes });
         steps.push({ id: 'dashboard' as TabId, label: 'إحصائيات', status: tabStatusMap.dashboard });
-        steps.push({ id: 'reports' as TabId, label: 'تقارير', status: tabStatusMap.reports });
 
         return steps;
     };
@@ -909,7 +907,6 @@ export default function App() {
                 {activeTab === 'class2' && renderClassInfo('secondClass')}
                 {activeTab === 'notes' && renderNotes()}
                 {activeTab === 'dashboard' && <Dashboard teacherName={report.general.name} />}
-                {activeTab === 'reports' && renderReports()}
                 {activeTab === 'about' && <AboutProject />}
             </main>
 

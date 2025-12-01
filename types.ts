@@ -38,7 +38,7 @@ export interface ListData {
     tasks: string[];
 }
 
-export type TabId = 'general' | 'quran' | 'class1' | 'class2' | 'notes' | 'dashboard' | 'reports' | 'about';
+export type TabId = 'general' | 'quran' | 'class1' | 'class2' | 'notes' | 'dashboard' | 'about';
 
 export type CompletionStatus = 'complete' | 'partial' | 'incomplete';
 
