@@ -1,6 +1,9 @@
 {
   "name": "تقارير الحصص الدراسية",
   "short_name": "تقارير الحصص",
+{
+  "name": "تقارير الحصص الدراسية",
+  "short_name": "تقارير الحصص",
   "description": "تطبيق لتسجيل وإدارة تقارير الحصص الدراسية",
   "start_url": "/",
   "display": "standalone",
@@ -9,14 +12,9 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
     }
   ]
 }
