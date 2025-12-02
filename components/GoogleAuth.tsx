@@ -13,7 +13,21 @@ interface GoogleAuthWrapperProps {
 export const GoogleAuthWrapper: React.FC<GoogleAuthWrapperProps> = ({ children }) => {
     if (!CLIENT_ID) {
         console.error('Google Client ID not configured');
-        return <>{children}</>;
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                <div className="bg-white p-6 rounded-xl shadow-xl max-w-md w-full text-center border-2 border-red-500">
+                    <h2 className="text-xl font-bold text-red-600 mb-2">خطأ في الإعدادات</h2>
+                    <p className="text-gray-700 mb-4">
+                        لم يتم تكوين Google Client ID.
+                        <br />
+                        يرجى إضافة <code>VITE_GOOGLE_CLIENT_ID</code> إلى متغيرات البيئة في Vercel.
+                    </p>
+                    <div className="bg-gray-100 p-2 rounded text-xs text-left overflow-auto">
+                        See console for details.
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
