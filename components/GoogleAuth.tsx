@@ -37,8 +37,11 @@ export const GoogleLinkButton: React.FC<GoogleLinkButtonProps> = ({
     mode,
     registrationId 
 }) => {
+    const [isLoading, setIsLoading] = React.useState(false);
+    
     const login = useGoogleLogin({
         onSuccess: async (response) => {
+            setIsLoading(true);
             try {
                 // Fetch user info from Google
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -58,21 +61,35 @@ export const GoogleLinkButton: React.FC<GoogleLinkButtonProps> = ({
                 }
             } catch (err) {
                 onError(err instanceof Error ? err.message : 'فشل تسجيل الدخول بـ Gmail');
+            } finally {
+                setIsLoading(false);
             }
         },
         onError: () => {
+            setIsLoading(false);
             onError('تم إلغاء تسجيل الدخول');
         },
+        flow: 'implicit', // Use popup instead of redirect
         scope: 'openid email profile'
     });
 
     return (
         <button
             onClick={() => login()}
-            className="w-full py-3 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+            disabled={isLoading}
+            className="w-full py-3 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-            <Mail size={20} />
-            <span>ربط الحساب بـ Gmail</span>
+            {isLoading ? (
+                <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>جاري التسجيل...</span>
+                </>
+            ) : (
+                <>
+                    <Mail size={20} />
+                    <span>ربط الحساب بـ Gmail</span>
+                </>
+            )}
         </button>
     );
 };

@@ -381,14 +381,21 @@ export default function App() {
     };
     
     const handleEmailLinkSuccess = () => {
+        // Close modal first
         setShowEmailLinkModal(false);
         setShowReminder(false);
         
-        // Update session
-        const session = getCurrentSession();
-        if (session) {
-            setAuthSession(session);
-        }
+        // Small delay to ensure modal closes smoothly
+        setTimeout(() => {
+            // Update session
+            const session = getCurrentSession();
+            if (session) {
+                setAuthSession(session);
+                
+                // Force a small re-render to ensure UI updates
+                setReport(prev => ({ ...prev }));
+            }
+        }, 100);
     };
     
     const handleEmailLinkLater = () => {
