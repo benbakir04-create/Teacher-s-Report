@@ -143,7 +143,7 @@ export default function App() {
 
     // Load data from LocalStorage on mount
     useEffect(() => {
-        console.log('🚀 App Version: 1.1.1 - CORS Fix Applied'); // Version Check
+        console.log('🚀 App Version: 1.2.0 - Google Auth Fix + SW v5'); // Version Check
         // Register Service Worker for PWA
         registerServiceWorker();
         

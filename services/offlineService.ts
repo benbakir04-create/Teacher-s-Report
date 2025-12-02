@@ -153,14 +153,34 @@ export function registerServiceWorker(): void {
         .then((registration) => {
           console.log('ServiceWorker registered:', registration.scope);
           
-          // التحقق من التحديثات
+          // Check for updates
           registration.addEventListener('updatefound', () => {
-            console.log('New version available');
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New content is available; please refresh.
+                  console.log('New version available. Refreshing...');
+                  if (confirm('تحديث جديد متوفر! هل تريد تحديث التطبيق الآن؟')) {
+                    window.location.reload();
+                  }
+                }
+              });
+            }
           });
         })
         .catch((error) => {
           console.error('ServiceWorker registration failed:', error);
         });
+        
+      // Reload when controller changes
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     });
   }
 }
