@@ -7,6 +7,9 @@ import { CheckboxGrid } from './components/CheckboxGrid';
 import { ProgressStepper } from './components/ProgressStepper';
 import { AboutProject } from './components/AboutProject';
 import { Dashboard } from './Dashboard';
+import { LoginScreen } from './components/LoginScreen';
+import { EmailLinkModal } from './components/EmailLinkModal';
+import { ReminderBanner } from './components/ReminderBanner';
 import { MOCK_DATA } from './constants';
 import { ReportData, TabId, ClassData, CompletionStatus, ListData } from './types';
 import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, TrendingUp, Award, AlertCircle, WifiOff } from 'lucide-react';
@@ -24,6 +27,12 @@ import {
     registerServiceWorker,
     getPendingReports
 } from './services/offlineService';
+import { 
+    loginWithRegistrationId,
+    getCurrentSession,
+    dismissDailyReminder,
+    AuthSession
+} from './services/authService';
 
 
 const initialClassData: ClassData = {
@@ -124,6 +133,12 @@ export default function App() {
     // Connection Status
     const [online, setOnline] = useState(isOnline());
     const [pendingCount, setPendingCount] = useState(0);
+    
+    // Authentication State
+    const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+    const [isAuthenticating, setIsAuthenticating] = useState(true);
+    const [showEmailLinkModal, setShowEmailLinkModal] = useState(false);
+    const [showReminder, setShowReminder] = useState(false);
 
 
     // Load data from LocalStorage on mount
@@ -206,6 +221,37 @@ export default function App() {
         if (savedImage) {
             setUserImage(savedImage);
         }
+        
+        // Check authentication session
+        const session = getCurrentSession();
+        if (session) {
+            setAuthSession(session);
+            
+            // Pre-fill report data from teacher profile
+            setReport(prev => ({
+                ...prev,
+                general: {
+                    ...prev.general,
+                    id: session.teacher.registrationId,
+                    name: session.teacher.name,
+                    school: session.teacher.school,
+                    level: session.teacher.level,
+                    sectionId: session.teacher.section
+                }
+            }));
+            
+            // Show email link modal if needed (first use or enforced)
+            if (session.needsEmailLink) {
+                const canDismiss = !session.teacher.emailRequired || session.daysSinceFirstUse < 14;
+                if (!canDismiss) {
+                    setShowEmailLinkModal(true);
+                } else {
+                    setShowReminder(true);
+                }
+            }
+        }
+        
+        setIsAuthenticating(false);
     }, []);
 
     // Reset accordion state when switching tabs
@@ -296,6 +342,68 @@ export default function App() {
             localStorage.setItem('user_profile_image', base64String);
         };
         reader.readAsDataURL(file);
+    };
+    
+    // Authentication Handlers
+    const handleLogin = async (registrationId: string) => {
+        try {
+            const session = await loginWithRegistrationId(registrationId);
+            setAuthSession(session);
+            
+            // Pre-fill report data
+            setReport(prev => ({
+                ...prev,
+                general: {
+                    ...prev.general,
+                    id: session.teacher.registrationId,
+                    name: session.teacher.name,
+                    school: session.teacher.school,
+                    level: session.teacher.level,
+                    sectionId: session.teacher.section
+                }
+            }));
+            
+            // Show email link modal if needed
+            if (session.needsEmailLink) {
+                const canDismiss = !session.teacher.emailRequired || session.daysSinceFirstUse < 14;
+                if (!canDismiss) {
+                    setShowEmailLinkModal(true);
+                } else {
+                    setShowReminder(true);
+                }
+            }
+        } catch (error: any) {
+            if (error.message === 'DEVICE_MISMATCH') {
+                throw new Error('هذا الحساب مربوط بجهاز آخر. يرجى تسجيل الدخول بـ Gmail');
+            }
+            throw error;
+        }
+    };
+    
+    const handleEmailLinkSuccess = () => {
+        setShowEmailLinkModal(false);
+        setShowReminder(false);
+        
+        // Update session
+        const session = getCurrentSession();
+        if (session) {
+            setAuthSession(session);
+        }
+    };
+    
+    const handleEmailLinkLater = () => {
+        setShowEmailLinkModal(false);
+        dismissDailyReminder();
+    };
+    
+    const handleReminderDismiss = () => {
+        setShowReminder(false);
+        dismissDailyReminder();
+    };
+    
+    const handleReminderLink = () => {
+        setShowReminder(false);
+        setShowEmailLinkModal(true);
     };
 
     const handleGeneralChange = (field: keyof typeof report.general, value: string) => {
@@ -881,8 +989,34 @@ export default function App() {
         );
     };
 
+    // Show loading while checking authentication
+    if (isAuthenticating) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                <div className="text-white text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+                    <p className="text-lg font-bold">جاري التحميل...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    // Show login screen if not authenticated
+    if (!authSession) {
+        return <LoginScreen onLogin={handleLogin} />;
+    }
+
     return (
         <>
+            {/* Reminder Banner */}
+            {showReminder && authSession && (
+                <ReminderBanner 
+                    daysSinceFirstUse={authSession.daysSinceFirstUse}
+                    onLink={handleReminderLink}
+                    onDismiss={handleReminderDismiss}
+                />
+            )}
+            
             {/* Connection Status Indicator */}
             {!online && (
                 <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-center py-2 z-50 flex items-center justify-center gap-2">
@@ -973,6 +1107,15 @@ export default function App() {
                         </button>
                     </div>
                 </div>
+            )}
+            
+            {/* Email Link Modal */}
+            {showEmailLinkModal && authSession && (
+                <EmailLinkModal 
+                    onLink={handleEmailLinkSuccess}
+                    onLater={handleEmailLinkLater}
+                    canDismiss={!authSession.teacher.emailRequired || authSession.daysSinceFirstUse < 14}
+                />
             )}
         </div>
     </>
