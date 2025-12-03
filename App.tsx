@@ -251,7 +251,7 @@ export default function App() {
                 if (!canDismiss) {
                     setShowEmailLinkModal(true);
                 } else {
-                    // setShowReminder(true);
+                    setShowEmailLinkModal(true); // Show popup for optional linking
                 }
             }
         }
@@ -370,12 +370,7 @@ export default function App() {
             
             // Show email link modal if needed
             if (session.needsEmailLink) {
-                const canDismiss = !session.teacher.emailRequired || session.daysSinceFirstUse < 14;
-                if (!canDismiss) {
-                    setShowEmailLinkModal(true);
-                } else {
-                    // Reminder removed
-                }
+                setShowEmailLinkModal(true);
             }
         } catch (error: any) {
             if (error.message === 'DEVICE_MISMATCH') {
@@ -1198,6 +1193,18 @@ export default function App() {
                     canDismiss={!authSession.teacher.emailRequired || authSession.daysSinceFirstUse < 14}
                 />
             )}
+
+            {/* Account Modal */}
+            <AccountModal
+                isOpen={showAccountModal}
+                onClose={() => setShowAccountModal(false)}
+                teacher={authSession?.teacher || null}
+                userImage={userImage}
+                googlePhotoUrl={authSession?.teacher?.email ? `https://ui-avatars.com/api/?name=${encodeURIComponent(authSession.teacher.name)}&background=667eea&color=fff&size=128` : null}
+                onLogout={handleLogout}
+                onClearCache={handleClearCache}
+                onImageUpload={handleImageUpload}
+            />
         </div>
     </>
     );

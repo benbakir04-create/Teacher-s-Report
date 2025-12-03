@@ -1,23 +1,45 @@
-import React from 'react';
-import { X, LogOut, RefreshCw, Trash2, User } from 'lucide-react';
+import React, { useRef } from 'react';
+import { X, LogOut, RefreshCw, Camera, User } from 'lucide-react';
 import { TeacherData } from '../services/teacherService';
 
 interface AccountModalProps {
     isOpen: boolean;
     onClose: () => void;
     teacher: TeacherData | null;
+    userImage?: string | null;
+    googlePhotoUrl?: string | null;
     onLogout: () => void;
     onClearCache: () => void;
+    onImageUpload?: (file: File) => void;
 }
 
 export const AccountModal: React.FC<AccountModalProps> = ({ 
     isOpen, 
     onClose, 
     teacher, 
+    userImage,
+    googlePhotoUrl,
     onLogout, 
-    onClearCache 
+    onClearCache,
+    onImageUpload
 }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     if (!isOpen) return null;
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && onImageUpload) {
+            onImageUpload(file);
+        }
+    };
+
+    // Priority: Google photo > Custom upload > Default icon
+    const displayImage = googlePhotoUrl || userImage;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
@@ -35,15 +57,45 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                 {/* Body */}
                 <div className="p-6 space-y-6">
-                    {/* User Info */}
+                    {/* User Info with Profile Picture */}
                     <div className="text-center space-y-2">
-                        <div className="w-20 h-20 bg-gray-100 rounded-full mx-auto flex items-center justify-center border-4 border-white shadow-lg -mt-12 relative z-10">
-                            <span className="text-3xl">👤</span>
+                        <div 
+                            onClick={handleImageClick}
+                            className="w-24 h-24 bg-gradient-to-br from-primary to-secondary rounded-full mx-auto flex items-center justify-center border-4 border-white shadow-lg -mt-14 relative z-10 cursor-pointer hover:scale-105 transition-transform group overflow-hidden"
+                        >
+                            {displayImage ? (
+                                <img 
+                                    src={displayImage} 
+                                    alt="Profile" 
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <span className="text-4xl text-white">
+                                    {teacher?.name ? teacher.name.charAt(0) : '👤'}
+                                </span>
+                            )}
+                            {/* Camera overlay on hover */}
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Camera size={24} className="text-white" />
+                            </div>
                         </div>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="hidden"
+                        />
+                        <p className="text-[10px] text-gray-400">اضغط على الصورة لتغييرها</p>
                         <div>
                             <h3 className="font-bold text-xl text-gray-800">{teacher?.name || 'مستخدم'}</h3>
                             <p className="text-sm text-gray-500 font-mono">{teacher?.registrationId}</p>
                             <p className="text-xs text-gray-400 mt-1">{teacher?.school}</p>
+                            {teacher?.email && (
+                                <p className="text-xs text-green-600 mt-1 flex items-center justify-center gap-1">
+                                    <span>✓</span> {teacher.email}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -59,7 +111,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             تحديث التطبيق وحل المشاكل
                         </button>
                         <p className="text-[10px] text-gray-400 text-center px-4">
-                            استخدم هذا الزر إذا واجهت مشاكل في التطبيق أو لضمان الحصول على آخر تحديث. سيتم إعادة تحميل الصفحة.
+                            استخدم هذا الزر إذا واجهت مشاكل في التطبيق أو لضمان الحصول على آخر تحديث
                         </p>
 
                         <button

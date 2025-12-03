@@ -28,7 +28,24 @@ export interface AuthSession {
  */
 export async function loginWithRegistrationId(registrationId: string): Promise<AuthSession> {
     // Fetch teacher from Google Sheets
-    const teacher = await fetchTeacherByRegistrationId(registrationId);
+    let teacher = await fetchTeacherByRegistrationId(registrationId);
+    
+    // DEMO MODE: If teacher not found and running locally, create demo teacher
+    if (!teacher && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        console.log('🎭 Demo Mode: Creating demo teacher for development');
+        teacher = {
+            registrationId: registrationId,
+            name: 'معلم تجريبي',
+            school: 'مدرسة الاختبار',
+            level: 'الخامسة ابتدائي',
+            section: 'أ',
+            email: '',
+            deviceFingerprint: '',
+            firstUseDate: new Date().toISOString(),
+            linkDate: '',
+            emailRequired: false
+        };
+    }
     
     if (!teacher) {
         throw new Error('رقم التسجيل غير موجود. يرجى التأكد من الرقم أو التواصل مع الإدارة');
@@ -60,7 +77,10 @@ export async function loginWithRegistrationId(registrationId: string): Promise<A
     // Update device fingerprint if not set
     if (!teacher.deviceFingerprint) {
         teacher.deviceFingerprint = currentFingerprint;
-        await updateDeviceFingerprint(registrationId, currentFingerprint);
+        // Skip update to Google Sheets in demo mode
+        if (!(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            await updateDeviceFingerprint(registrationId, currentFingerprint);
+        }
     }
     
     // Set first use date if not set
