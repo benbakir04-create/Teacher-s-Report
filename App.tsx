@@ -9,7 +9,7 @@ import { AboutProject } from './components/AboutProject';
 import { Dashboard } from './Dashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { EmailLinkModal } from './components/EmailLinkModal';
-import { ReminderBanner } from './components/ReminderBanner';
+import { AccountModal } from './components/AccountModal';
 import { MOCK_DATA } from './constants';
 import { ReportData, TabId, ClassData, CompletionStatus, ListData } from './types';
 import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, TrendingUp, Award, AlertCircle, WifiOff } from 'lucide-react';
@@ -17,6 +17,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import QRCode from 'qrcode';
 import { loadData, getLessonsForSubject } from './dataManager';
 import { saveReport, saveBackup, logError } from './services/googleSheetsService';
+import { googleLogout } from '@react-oauth/google';
+import toast, { Toaster } from 'react-hot-toast';
 import { 
     isOnline, 
     savePendingReport, 
@@ -25,12 +27,14 @@ import {
     getSavedUserData,
     setupConnectionListeners,
     registerServiceWorker,
-    getPendingReports
+    getPendingReports,
+    clearAppCache
 } from './services/offlineService';
 import { 
     loginWithRegistrationId,
     getCurrentSession,
     dismissDailyReminder,
+    logout,
     AuthSession
 } from './services/authService';
 
@@ -138,7 +142,8 @@ export default function App() {
     const [authSession, setAuthSession] = useState<AuthSession | null>(null);
     const [isAuthenticating, setIsAuthenticating] = useState(true);
     const [showEmailLinkModal, setShowEmailLinkModal] = useState(false);
-    const [showReminder, setShowReminder] = useState(false);
+    const [showAccountModal, setShowAccountModal] = useState(false);
+    // const [showReminder, setShowReminder] = useState(false);
 
 
     // Load data from LocalStorage on mount
@@ -246,7 +251,7 @@ export default function App() {
                 if (!canDismiss) {
                     setShowEmailLinkModal(true);
                 } else {
-                    setShowReminder(true);
+                    // setShowReminder(true);
                 }
             }
         }
@@ -369,7 +374,7 @@ export default function App() {
                 if (!canDismiss) {
                     setShowEmailLinkModal(true);
                 } else {
-                    setShowReminder(true);
+                    // Reminder removed
                 }
             }
         } catch (error: any) {
@@ -383,7 +388,7 @@ export default function App() {
     const handleEmailLinkSuccess = () => {
         // Close modal first
         setShowEmailLinkModal(false);
-        setShowReminder(false);
+        // setShowReminder(false);
         
         // Small delay to ensure modal closes smoothly
         setTimeout(() => {
@@ -398,18 +403,32 @@ export default function App() {
         }, 100);
     };
     
+    const handleLogout = () => {
+        logout();
+        googleLogout();
+        setAuthSession(null);
+        setReport(initialReport);
+        setShowAccountModal(false);
+        setActiveTab('general');
+    };
+
+    const handleClearCache = () => {
+        if (confirm('سيتم مسح جميع البيانات المؤقتة وإعادة تحميل التطبيق. هل أنت متأكد؟')) {
+            clearAppCache();
+        }
+    };
+
+
+
     const handleEmailLinkLater = () => {
         setShowEmailLinkModal(false);
         dismissDailyReminder();
     };
     
-    const handleReminderDismiss = () => {
-        setShowReminder(false);
-        dismissDailyReminder();
-    };
+    // Removed ReminderBanner handlers
     
     const handleReminderLink = () => {
-        setShowReminder(false);
+        // setShowReminder(false);
         setShowEmailLinkModal(true);
     };
 
@@ -430,7 +449,7 @@ export default function App() {
     const saveToArchive = async () => {
         // 1. التحقق من البيانات الأساسية
         if (!report.general.name || !report.general.school || !report.general.level || !report.general.sectionId || !report.general.date) {
-            alert("يرجى إكمال جميع البيانات الأساسية (الاسم، المدرسة، المستوى، القسم، التاريخ)");
+            toast.error("يرجى إكمال جميع البيانات الأساسية (الاسم، المدرسة، المستوى، القسم، التاريخ)");
             setActiveTab('general');
             return;
         }
@@ -438,14 +457,14 @@ export default function App() {
         // 2. التحقق من الحصة الأولى (إلزامية)
         const c1 = report.firstClass;
         if (!c1.subject || !c1.lesson || c1.strategies.length === 0 || c1.tools.length === 0 || c1.tasks.length === 0) {
-             alert("يرجى إكمال جميع بيانات الحصة الأولى (المادة، الدرس، الاستراتيجيات، الوسائل، المهام)");
+             toast.error("يرجى إكمال جميع بيانات الحصة الأولى (المادة، الدرس، الاستراتيجيات، الوسائل، المهام)");
              setActiveTab('class1');
              return;
         }
 
         // التحقق من الجنس للحصة الأولى إذا كان مطلوباً
         if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c1.subject.includes('فقه') && !c1.gender) {
-            alert("يرجى اختيار الجنس للحصة الأولى");
+            toast.error("يرجى اختيار الجنس للحصة الأولى");
             setActiveTab('class1');
             return;
         }
@@ -454,14 +473,14 @@ export default function App() {
         if (report.hasSecondClass) {
             const c2 = report.secondClass;
             if (!c2.subject || !c2.lesson || c2.strategies.length === 0 || c2.tools.length === 0 || c2.tasks.length === 0) {
-                alert("يرجى إكمال جميع بيانات الحصة الثانية");
+                toast.error("يرجى إكمال جميع بيانات الحصة الثانية");
                 setActiveTab('class2');
                 return;
             }
             
             // التحقق من الجنس للحصة الثانية إذا كان مطلوباً
             if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c2.subject.includes('فقه') && !c2.gender) {
-                alert("يرجى اختيار الجنس للحصة الثانية");
+                toast.error("يرجى اختيار الجنس للحصة الثانية");
                 setActiveTab('class2');
                 return;
             }
@@ -492,13 +511,13 @@ export default function App() {
             if (online) {
                 await saveReport(report);
                 await saveBackup(report);
-                alert("✅ تم حفظ التقرير في Google Sheets بنجاح!");
+                toast.success("✅ تم حفظ التقرير بنجاح!");
                 setPendingCount(0);
             } else {
                 // حفظ معلق للمزامنة لاحقاً
                 savePendingReport(report);
                 setPendingCount(prev => prev + 1);
-                alert("📡 تم حفظ التقرير محلياً. سيتم الإرسال عند عودة الاتصال");
+                toast("📡 تم حفظ التقرير محلياً. سيتم الإرسال عند عودة الاتصال", { icon: '📡', duration: 4000 });
             }
         } catch (error) {
             console.error('Error saving to Google Sheets:', error);
@@ -507,7 +526,7 @@ export default function App() {
             // حفظ معلق للمزامنة لاحقاً
             savePendingReport(report);
             setPendingCount(prev => prev + 1);
-            alert("⚠️ تم حفظ التقرير محلياً. سيتم المحاولة لاحقاً");
+            toast.error("⚠️ تم حفظ التقرير محلياً. سيتم المحاولة لاحقاً");
         }
 
         // Reset Form Logic (Keep Teacher Info, Clear Report Details)
@@ -540,6 +559,7 @@ export default function App() {
         
         // Return to first tab
         setActiveTab('general');
+    };
 
     const loadFromHistory = (uid: string) => {
         if (!uid) return;
@@ -547,7 +567,7 @@ export default function App() {
         if (selectedReport) {
             const { savedAt, uid, ...reportData } = selectedReport;
             setReport(reportData);
-            alert("تم استرجاع البيانات بنجاح");
+            toast.success("تم استرجاع البيانات بنجاح");
         }
     };
 
@@ -1045,14 +1065,7 @@ export default function App() {
 
     return (
         <>
-            {/* Reminder Banner */}
-            {showReminder && authSession && (
-                <ReminderBanner 
-                    daysSinceFirstUse={authSession.daysSinceFirstUse}
-                    onLink={handleReminderLink}
-                    onDismiss={handleReminderDismiss}
-                />
-            )}
+            {/* Reminder Banner Removed */}
             
             {/* Connection Status Indicator */}
             {!online && (
@@ -1078,6 +1091,37 @@ export default function App() {
                     </div>
                 </div>
             )}
+
+            {/* Toast Notifications */}
+            <Toaster 
+                position="top-center"
+                reverseOrder={false}
+                toastOptions={{
+                    duration: 3000,
+                    style: {
+                        background: '#fff',
+                        color: '#333',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    },
+                    success: {
+                        iconTheme: {
+                            primary: '#10b981',
+                            secondary: '#fff',
+                        },
+                    },
+                    error: {
+                        iconTheme: {
+                            primary: '#ef4444',
+                            secondary: '#fff',
+                        },
+                    },
+                }}
+            />
+
             
             <div className="min-h-screen pb-[90px] bg-[#f3f4f6]">
             {/* Integrated Header and Stepper Wrapper */}
@@ -1086,7 +1130,7 @@ export default function App() {
                     teacherName={report.general.name} 
                     userImage={userImage}
                     onQrClick={() => setIsQrModalOpen(true)}
-                    onImageUpload={handleImageUpload}
+                    onAvatarClick={() => setShowAccountModal(true)}
                 />
                 <ProgressStepper 
                     steps={getSteps()} 
