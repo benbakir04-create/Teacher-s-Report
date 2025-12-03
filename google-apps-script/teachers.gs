@@ -1,5 +1,5 @@
 /**
- * Teachers Management Functions
+ * Teachers Management Functions & Reports Handler
  *
  * Add these functions to your existing Google Apps Script project
  */
@@ -184,31 +184,97 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
 }
 
 /**
- * Update existing doPost to handle new actions
+ * Main POST Handler
  */
 function doPost(e) {
   try {
+    // السماح بـ CORS
+    const output = ContentService.createTextOutput();
+    output.setMimeType(ContentService.MimeType.JSON);
+
+    // قراءة البيانات
     const data = JSON.parse(e.postData.contents);
+    const action = data.action;
 
-    // Existing actions...
-    if (data.action === "appendToSheet") {
-      // ... existing code
-    }
+    // الحصول على الملف النشط
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // New teacher actions
-    if (data.action === "getTeacherByRegistrationId") {
+    // --- معالجة إضافة البيانات (للتقارير) ---
+    if (action === "appendToSheet") {
+      const range = data.range;
+      const values = data.values;
+
+      // استخراج اسم الورقة من النطاق
+      const sheetName = range.split("!")[0];
+      let sheet = ss.getSheetByName(sheetName);
+
+      // إنشاء الورقة إذا لم تكن موجودة
+      if (!sheet) {
+        sheet = ss.insertSheet(sheetName);
+
+        // إضافة رؤوس حسب نوع الورقة
+        if (sheetName === "التقارير") {
+          const headers = [
+            "الطابع الزمني",
+            "رقم التسجيل",
+            "الاسم",
+            "المدرسة",
+            "المستوى",
+            "القسم",
+            "التاريخ",
+            "تقرير القرآن",
+            "مادة الحصة 1",
+            "جنس 1", // <-- جديد
+            "درس الحصة 1",
+            "استراتيجيات 1",
+            "وسائل 1",
+            "مهام 1",
+            "يوجد حصة ثانية",
+            "مادة الحصة 2",
+            "جنس 2", // <-- جديد
+            "درس الحصة 2",
+            "استراتيجيات 2",
+            "وسائل 2",
+            "مهام 2",
+            "ملاحظات",
+          ];
+          sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (sheetName === "النسخ_الاحتياطي") {
+          sheet.getRange(1, 1, 1, 2).setValues([["الطابع الزمني", "البيانات"]]);
+        } else if (sheetName === "الأخطاء") {
+          sheet
+            .getRange(1, 1, 1, 3)
+            .setValues([["الطابع الزمني", "السياق", "الخطأ"]]);
+        }
+      }
+
+      // إضافة الصفوف
+      values.forEach((row) => {
+        sheet.appendRow(row);
+      });
+
+      return output.setContent(
+        JSON.stringify({
+          success: true,
+          message: "Data added successfully",
+        })
+      );
+    } 
+    
+    // --- معالجة بيانات المعلمين ---
+    else if (action === "getTeacherByRegistrationId") {
       return ContentService.createTextOutput(
         JSON.stringify(getTeacherByRegistrationId(data.registrationId))
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (data.action === "updateTeacherData") {
+    else if (action === "updateTeacherData") {
       return ContentService.createTextOutput(
         JSON.stringify(updateTeacherData(data.registrationId, data.updates))
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (data.action === "linkTeacherEmail") {
+    else if (action === "linkTeacherEmail") {
       return ContentService.createTextOutput(
         JSON.stringify(
           linkTeacherEmail(
@@ -220,7 +286,7 @@ function doPost(e) {
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    if (data.action === "updateDeviceFingerprint") {
+    else if (action === "updateDeviceFingerprint") {
       return ContentService.createTextOutput(
         JSON.stringify(
           updateDeviceFingerprint(data.registrationId, data.deviceFingerprint)
@@ -228,12 +294,30 @@ function doPost(e) {
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
-    return ContentService.createTextOutput(
-      JSON.stringify({ success: false, error: "Unknown action" })
-    ).setMimeType(ContentService.MimeType.JSON);
+    else {
+      return output.setContent(
+        JSON.stringify({
+          success: false,
+          message: "Unknown action",
+        })
+      );
+    }
   } catch (error) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, error: error.toString() })
+      JSON.stringify({
+        success: false,
+        message: error.toString(),
+      })
     ).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// للسماح بطلبات OPTIONS (CORS preflight)
+function doGet(e) {
+  return ContentService.createTextOutput(
+    JSON.stringify({
+      status: "ready",
+      message: "Web App is running",
+    })
+  ).setMimeType(ContentService.MimeType.JSON);
 }

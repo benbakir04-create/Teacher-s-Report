@@ -509,7 +509,37 @@ export default function App() {
             setPendingCount(prev => prev + 1);
             alert("⚠️ تم حفظ التقرير محلياً. سيتم المحاولة لاحقاً");
         }
-    };
+
+        // Reset Form Logic (Keep Teacher Info, Clear Report Details)
+        setReport(prev => ({
+            ...prev,
+            general: {
+                ...prev.general,
+                date: '' // Reset date
+            },
+            quranReport: '',
+            firstClass: {
+                subject: '',
+                gender: '',
+                lesson: '',
+                strategies: [],
+                tools: [],
+                tasks: []
+            },
+            hasSecondClass: false,
+            secondClass: {
+                subject: '',
+                gender: '',
+                lesson: '',
+                strategies: [],
+                tools: [],
+                tasks: []
+            },
+            notes: ''
+        }));
+        
+        // Return to first tab
+        setActiveTab('general');
 
     const loadFromHistory = (uid: string) => {
         if (!uid) return;
