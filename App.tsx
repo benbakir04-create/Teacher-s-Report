@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -10,74 +8,18 @@ import { Dashboard } from './Dashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { EmailLinkModal } from './components/EmailLinkModal';
 import { AccountModal } from './components/AccountModal';
-import { MOCK_DATA } from './constants';
-import { ReportData, TabId, ClassData, CompletionStatus, ListData } from './types';
-import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, TrendingUp, Award, AlertCircle, WifiOff } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { TabId } from './types';
+import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, WifiOff } from 'lucide-react';
 import QRCode from 'qrcode';
-import { loadData, getLessonsForSubject } from './dataManager';
-import { saveReport, saveBackup, logError } from './services/googleSheetsService';
-import { googleLogout } from '@react-oauth/google';
-import toast, { Toaster } from 'react-hot-toast';
-import { 
-    isOnline, 
-    savePendingReport, 
-    syncPendingReports, 
-    saveUserData as saveUserDataToStorage,
-    getSavedUserData,
-    setupConnectionListeners,
-    registerServiceWorker,
-    getPendingReports,
-    clearAppCache
-} from './services/offlineService';
-import { 
-    loginWithRegistrationId,
-    getCurrentSession,
-    dismissDailyReminder,
-    logout,
-    AuthSession
-} from './services/authService';
+import { Toaster } from 'react-hot-toast';
 
+// Custom Hooks
+import { useAuth } from './hooks/useAuth';
+import { useReportForm } from './hooks/useReportForm';
+import { useOfflineSync } from './hooks/useOfflineSync';
+import { useAppData } from './hooks/useAppData';
 
-const initialClassData: ClassData = {
-    subject: '',
-    lesson: '',
-    strategies: [],
-    tools: [],
-    tasks: [],
-    gender: ''
-};
-
-const initialReport: ReportData = {
-    general: {
-        id: '',
-        name: '',
-        school: '',
-        level: '',
-        sectionId: '',
-        date: new Date().toISOString().split('T')[0]
-    },
-    quranReport: '',
-    firstClass: { ...initialClassData },
-    secondClass: { ...initialClassData },
-    hasSecondClass: false,
-    notes: ''
-};
-
-interface ArchivedReport extends ReportData {
-    savedAt: number;
-    uid: string;
-}
-
-// Mock Data for Reports Chart
-interface ChartData {
-    subject: string;
-    total: number; // Expected
-    actual: number; // Executed
-    percentage: string;
-}
-
-// Helper to format date as YYYY/MM/DD so it reads Day-Month-Year from Right-to-Left visually in RTL inputs
+// Helper to format date as YYYY/MM/DD
 const formatDateDisplay = (dateString: string): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -88,239 +30,82 @@ const formatDateDisplay = (dateString: string): string => {
     return `${year}/${month}/${day}`;
 };
 
-// Custom Tick Component for wrapping text on XAxis
-const CustomizedAxisTick = (props: any) => {
-    const { x, y, payload } = props;
-    const words = payload.value.split(' ');
-    return (
-        <g transform={`translate(${x},${y})`}>
-            {words.map((word: string, index: number) => (
-                <text 
-                    x={0} 
-                    y={0} 
-                    dy={10 + (index * 12)} 
-                    textAnchor="middle" 
-                    fill="#6b7280" 
-                    fontSize={10} 
-                    fontWeight={500}
-                    key={index}
-                >
-                    {word}
-                </text>
-            ))}
-        </g>
-    );
-};
-
 export default function App() {
-    const [report, setReport] = useState<ReportData>(initialReport);
-    const [activeTab, setActiveTab] = useState<TabId>('general');
-    const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+    console.log('🚀 App Rendering...');
+    // 1. Auth Hook
+    const { 
+        authSession, 
+        setAuthSession, 
+        isAuthenticating, 
+        showEmailLinkModal, 
+        setShowEmailLinkModal,
+        showAccountModal, 
+        setShowAccountModal, 
+        handleLogin, 
+        handleLogout, 
+        handleEmailLinkSuccess, 
+        handleEmailLinkLater 
+    } = useAuth();
+
+    // 2. Report Form Hook
+    const { 
+        report, 
+        setReport, 
+        activeTab, 
+        setActiveTab, 
+        archive, 
+        dateInputType, 
+        setDateInputType, 
+        handleGeneralChange, 
+        handleClassChange, 
+        loadFromHistory, 
+        saveToArchive, 
+        getTabStatus 
+    } = useReportForm();
+
+    // 3. Offline Sync Hook
+    const { 
+        online, 
+        pendingCount, 
+        setPendingCount, 
+        handleClearCache 
+    } = useOfflineSync();
+
+    // 4. App Data Hook
+    const { 
+        appData, 
+        isLoadingData, 
+        availableSubjects, 
+        statsData 
+    } = useAppData(report, handleClassChange);
+
+    // Local State for UI
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-    const [dateInputType, setDateInputType] = useState<'text' | 'date'>('text');
     const [userImage, setUserImage] = useState<string | null>(null);
-    
-    // Accordion State for Class Tabs
     const [openAccordion, setOpenAccordion] = useState<string | null>('strategies');
 
-    // Archive State
-    const [archive, setArchive] = useState<ArchivedReport[]>([]);
-
-    // Reports Stats
-    const [statsData, setStatsData] = useState<ChartData[]>([]);
-    
-    // Google Sheets Data
-    const [appData, setAppData] = useState<ListData>(MOCK_DATA);
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    
-    // Connection Status
-    const [online, setOnline] = useState(isOnline());
-    const [pendingCount, setPendingCount] = useState(0);
-    
-    // Authentication State
-    const [authSession, setAuthSession] = useState<AuthSession | null>(null);
-    const [isAuthenticating, setIsAuthenticating] = useState(true);
-    const [showEmailLinkModal, setShowEmailLinkModal] = useState(false);
-    const [showAccountModal, setShowAccountModal] = useState(false);
-    // const [showReminder, setShowReminder] = useState(false);
-
-
-    // Load data from LocalStorage on mount
+    // Sync Auth with Report
     useEffect(() => {
-        console.log('🚀 App Version: 1.2.0 - Google Auth Fix + SW v5'); // Version Check
-        // Register Service Worker for PWA
-        registerServiceWorker();
-        
-        // Setup connection listeners
-        setupConnectionListeners(
-            () => {
-                setOnline(true);
-                syncPendingReports().then(() => {
-                    setPendingCount(getPendingReports().length);
-                });
-            },
-            () => setOnline(false)
-        );
-        
-        // Load Google Sheets data
-        loadData()
-            .then(data => {
-                setAppData(data);
-                setIsLoadingData(false);
-            })
-            .catch(error => {
-                console.error('Failed to load data:', error);
-                setIsLoadingData(false);
-            });
-        
-        // Load saved user data
-        const savedUserData = getSavedUserData();
-        if (savedUserData) {
+        if (authSession) {
             setReport(prev => ({
                 ...prev,
                 general: {
                     ...prev.general,
-                    id: savedUserData.id || '',
-                    name: savedUserData.name || '',
-                    school: savedUserData.school || '',
-                    level: savedUserData.level || '',
-                    sectionId: savedUserData.sectionId || ''
-                    // لا نحفظ التاريخ
+                    id: authSession.teacher.registrationId,
+                    name: authSession.teacher.name,
+                    school: authSession.teacher.school,
+                    level: authSession.teacher.level,
+                    sectionId: authSession.teacher.section
                 }
             }));
         }
-        
-        const savedReport = localStorage.getItem('teacher_report_data');
-        if (savedReport) {
-            try {
-                const parsed = JSON.parse(savedReport);
-                setReport(prev => ({ ...prev, ...parsed }));
-            } catch (e) {
-                console.error("Failed to load local data", e);
-            }
-        }
-
-        const savedArchive = localStorage.getItem('teacher_report_archive');
-        if (savedArchive) {
-            try {
-                setArchive(JSON.parse(savedArchive));
-            } catch (e) {
-                console.error("Failed to load archive", e);
-            }
-        }
-        
-        // Check pending reports count
-        setPendingCount(getPendingReports().length);
-        
-        // Try to sync pending reports
-        if (isOnline()) {
-            syncPendingReports();
-        }
-        if (isOnline()) {
-            syncPendingReports();
-        }
-
-        // Load User Image
-        const savedImage = localStorage.getItem('user_profile_image');
-        if (savedImage) {
-            setUserImage(savedImage);
-        }
-        
-        // Check authentication session
-        const session = getCurrentSession();
-        if (session) {
-            setAuthSession(session);
-            
-            // Pre-fill report data from teacher profile
-            setReport(prev => ({
-                ...prev,
-                general: {
-                    ...prev.general,
-                    id: session.teacher.registrationId,
-                    name: session.teacher.name,
-                    school: session.teacher.school,
-                    level: session.teacher.level,
-                    sectionId: session.teacher.section
-                }
-            }));
-            
-            // Show email link modal if needed (first use or enforced)
-            if (session.needsEmailLink) {
-                const canDismiss = !session.teacher.emailRequired || session.daysSinceFirstUse < 14;
-                if (!canDismiss) {
-                    setShowEmailLinkModal(true);
-                } else {
-                    setShowEmailLinkModal(true); // Show popup for optional linking
-                }
-            }
-        }
-        
-        setIsAuthenticating(false);
-    }, []);
+    }, [authSession]);
 
     // Reset accordion state when switching tabs
     useEffect(() => {
         setOpenAccordion('strategies');
     }, [activeTab]);
-
-    // Save data to LocalStorage whenever report changes
-    useEffect(() => {
-        localStorage.setItem('teacher_report_data', JSON.stringify(report));
-    }, [report]);
-
-    // Save Archive to LocalStorage
-    useEffect(() => {
-        localStorage.setItem('teacher_report_archive', JSON.stringify(archive));
-    }, [archive]);
-
-    // Effect to update subjects and stats when level changes
-    useEffect(() => {
-        if (report.general.level) {
-            const subjects = appData.subjects[report.general.level] || [];
-            setAvailableSubjects(subjects);
-            
-            // Fixed curriculum list for the chart as requested
-            const reportSubjects = ["القرآن", "التربية الإيمانية", "الفقه", "اللغة العربية", "أحكام التجويد", "التاريخ"];
-            
-            // Generate Mock Stats with fixed values for visualization if no real data
-            const mockStats = reportSubjects.map(subj => {
-                const total = Math.floor(Math.random() * 10) + 15; // 15-25
-                const actual = Math.floor(Math.random() * total); // 0 to total
-                return {
-                    subject: subj,
-                    total: total,
-                    actual: actual,
-                    percentage: Math.round((actual/total) * 100) + '%'
-                };
-            });
-            setStatsData(mockStats);
-
-            // Reset subject selections if they are no longer valid
-            const validSubjects = appData.subjects[report.general.level] || [];
-            if (report.firstClass.subject && !validSubjects.includes(report.firstClass.subject)) {
-                handleClassChange('firstClass', 'subject', '');
-                handleClassChange('firstClass', 'lesson', '');
-            }
-            if (report.secondClass.subject && !validSubjects.includes(report.secondClass.subject)) {
-                handleClassChange('secondClass', 'subject', '');
-                handleClassChange('secondClass', 'lesson', '');
-            }
-        } else {
-            setAvailableSubjects([]);
-            setStatsData([]);
-        }
-
-        // Save user data when level changes
-        if (report.general.school && report.general.name) {
-            saveUserDataToStorage({
-                school: report.general.school,
-                name: report.general.name,
-                level: report.general.level,
-                sectionId: report.general.sectionId
-            });
-        }
-    }, [report.general.level, appData]);
 
     // Generate QR Code data
     useEffect(() => {
@@ -337,7 +122,13 @@ export default function App() {
             .catch(err => console.error(err));
     }, [report.general]);
 
-
+    // Load User Image
+    useEffect(() => {
+        const savedImage = localStorage.getItem('user_profile_image');
+        if (savedImage) {
+            setUserImage(savedImage);
+        }
+    }, []);
 
     const handleImageUpload = (file: File) => {
         const reader = new FileReader();
@@ -348,289 +139,26 @@ export default function App() {
         };
         reader.readAsDataURL(file);
     };
-    
-    // Authentication Handlers
-    const handleLogin = async (registrationId: string) => {
-        try {
-            const session = await loginWithRegistrationId(registrationId);
-            setAuthSession(session);
-            
-            // Pre-fill report data
-            setReport(prev => ({
-                ...prev,
-                general: {
-                    ...prev.general,
-                    id: session.teacher.registrationId,
-                    name: session.teacher.name,
-                    school: session.teacher.school,
-                    level: session.teacher.level,
-                    sectionId: session.teacher.section
-                }
-            }));
-            
-            // Show email link modal if needed
-            if (session.needsEmailLink) {
-                setShowEmailLinkModal(true);
-            }
-        } catch (error: any) {
-            if (error.message === 'DEVICE_MISMATCH') {
-                throw new Error('هذا الحساب مربوط بجهاز آخر. يرجى تسجيل الدخول بـ Gmail');
-            }
-            throw error;
-        }
-    };
-    
-    const handleEmailLinkSuccess = () => {
-        // Close modal first
-        setShowEmailLinkModal(false);
-        // setShowReminder(false);
-        
-        // Small delay to ensure modal closes smoothly
-        setTimeout(() => {
-            // Update session
-            const session = getCurrentSession();
-            if (session) {
-                setAuthSession(session);
-                
-                // Force a small re-render to ensure UI updates
-                setReport(prev => ({ ...prev }));
-            }
-        }, 100);
-    };
-    
-    const handleLogout = () => {
-        logout();
-        googleLogout();
-        setAuthSession(null);
-        setReport(initialReport);
-        setShowAccountModal(false);
-        setActiveTab('general');
-    };
-
-    const handleClearCache = () => {
-        if (confirm('سيتم مسح جميع البيانات المؤقتة وإعادة تحميل التطبيق. هل أنت متأكد؟')) {
-            clearAppCache();
-        }
-    };
-
-
-
-    const handleEmailLinkLater = () => {
-        setShowEmailLinkModal(false);
-        dismissDailyReminder();
-    };
-    
-    // Removed ReminderBanner handlers
-    
-    const handleReminderLink = () => {
-        // setShowReminder(false);
-        setShowEmailLinkModal(true);
-    };
-
-    const handleGeneralChange = (field: keyof typeof report.general, value: string) => {
-        setReport(prev => ({
-            ...prev,
-            general: { ...prev.general, [field]: value }
-        }));
-    };
-
-    const handleClassChange = (classType: 'firstClass' | 'secondClass', field: keyof ClassData, value: any) => {
-        setReport(prev => ({
-            ...prev,
-            [classType]: { ...prev[classType], [field]: value }
-        }));
-    };
-
-    const saveToArchive = async () => {
-        // 1. التحقق من البيانات الأساسية
-        if (!report.general.name || !report.general.school || !report.general.level || !report.general.sectionId || !report.general.date) {
-            toast.error("يرجى إكمال جميع البيانات الأساسية (الاسم، المدرسة، المستوى، القسم، التاريخ)");
-            setActiveTab('general');
-            return;
-        }
-
-        // 2. التحقق من الحصة الأولى (إلزامية)
-        const c1 = report.firstClass;
-        if (!c1.subject || !c1.lesson || c1.strategies.length === 0 || c1.tools.length === 0 || c1.tasks.length === 0) {
-             toast.error("يرجى إكمال جميع بيانات الحصة الأولى (المادة، الدرس، الاستراتيجيات، الوسائل، المهام)");
-             setActiveTab('class1');
-             return;
-        }
-
-        // التحقق من الجنس للحصة الأولى إذا كان مطلوباً
-        if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c1.subject.includes('فقه') && !c1.gender) {
-            toast.error("يرجى اختيار الجنس للحصة الأولى");
-            setActiveTab('class1');
-            return;
-        }
-
-        // 3. التحقق من الحصة الثانية (إذا وجدت)
-        if (report.hasSecondClass) {
-            const c2 = report.secondClass;
-            if (!c2.subject || !c2.lesson || c2.strategies.length === 0 || c2.tools.length === 0 || c2.tasks.length === 0) {
-                toast.error("يرجى إكمال جميع بيانات الحصة الثانية");
-                setActiveTab('class2');
-                return;
-            }
-            
-            // التحقق من الجنس للحصة الثانية إذا كان مطلوباً
-            if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c2.subject.includes('فقه') && !c2.gender) {
-                toast.error("يرجى اختيار الجنس للحصة الثانية");
-                setActiveTab('class2');
-                return;
-            }
-        }
-
-        const newEntry: ArchivedReport = {
-            ...report,
-            savedAt: Date.now(),
-            uid: Date.now().toString()
-        };
-
-        // حفظ في localStorage (للأرشيف المحلي)
-        const existingIndex = archive.findIndex(item => 
-            item.general.date === report.general.date && 
-            item.general.id === report.general.id
-        );
-
-        if (existingIndex >= 0) {
-            const updatedArchive = [...archive];
-            updatedArchive[existingIndex] = newEntry;
-            setArchive(updatedArchive);
-        } else {
-            setArchive(prev => [newEntry, ...prev]);
-        }
-        
-        // محاولة الحفظ في Google Sheets
-        try {
-            if (online) {
-                await saveReport(report);
-                await saveBackup(report);
-                toast.success("✅ تم حفظ التقرير بنجاح!");
-                setPendingCount(0);
-            } else {
-                // حفظ معلق للمزامنة لاحقاً
-                savePendingReport(report);
-                setPendingCount(prev => prev + 1);
-                toast("📡 تم حفظ التقرير محلياً. سيتم الإرسال عند عودة الاتصال", { icon: '📡', duration: 4000 });
-            }
-        } catch (error) {
-            console.error('Error saving to Google Sheets:', error);
-            logError('saveToArchive', error);
-            
-            // حفظ معلق للمزامنة لاحقاً
-            savePendingReport(report);
-            setPendingCount(prev => prev + 1);
-            toast.error("⚠️ تم حفظ التقرير محلياً. سيتم المحاولة لاحقاً");
-        }
-
-        // Reset Form Logic (Keep Teacher Info, Clear Report Details)
-        setReport(prev => ({
-            ...prev,
-            general: {
-                ...prev.general,
-                date: '' // Reset date
-            },
-            quranReport: '',
-            firstClass: {
-                subject: '',
-                gender: '',
-                lesson: '',
-                strategies: [],
-                tools: [],
-                tasks: []
-            },
-            hasSecondClass: false,
-            secondClass: {
-                subject: '',
-                gender: '',
-                lesson: '',
-                strategies: [],
-                tools: [],
-                tasks: []
-            },
-            notes: ''
-        }));
-        
-        // Return to first tab
-        setActiveTab('general');
-    };
-
-    const loadFromHistory = (uid: string) => {
-        if (!uid) return;
-        const selectedReport = archive.find(item => item.uid === uid);
-        if (selectedReport) {
-            const { savedAt, uid, ...reportData } = selectedReport;
-            setReport(reportData);
-            toast.success("تم استرجاع البيانات بنجاح");
-        }
-    };
-
-    // Validation Helpers
-    const getGeneralStatus = (): CompletionStatus => {
-        const { id, name, school, level, sectionId, date } = report.general;
-        const isComplete = !!(id && name && school && level && sectionId && date);
-        if (isComplete) return 'complete';
-        const isPartial = !!(id || name || school || level || sectionId);
-        return isPartial ? 'partial' : 'incomplete';
-    };
-
-    const getClassStatus = (classData: ClassData): CompletionStatus => {
-        const isComplete = !!(
-            classData.subject && 
-            classData.lesson && 
-            classData.strategies.length > 0 && 
-            classData.tools.length > 0 && 
-            classData.tasks.length > 0
-        );
-        if (isComplete) return 'complete';
-        const isPartial = !!(classData.subject || classData.lesson || classData.strategies.length > 0 || classData.tools.length > 0 || classData.tasks.length > 0);
-        return isPartial ? 'partial' : 'incomplete';
-    };
-
-    const getQuranStatus = (): CompletionStatus => {
-        if (report.quranReport.length > 5) return 'complete';
-        if (report.quranReport.length > 0) return 'partial';
-        return 'incomplete';
-    };
-
-    const getNotesStatus = (): CompletionStatus => {
-        if (report.notes.length > 5) return 'complete';
-        if (report.notes.length > 0) return 'partial';
-        return 'incomplete';
-    };
-
-    const getReportsStatus = (): CompletionStatus => 'complete';
-
-    const tabStatusMap: Record<TabId, CompletionStatus> = {
-        general: getGeneralStatus(),
-        quran: getQuranStatus(),
-        class1: getClassStatus(report.firstClass),
-        class2: getClassStatus(report.secondClass),
-        notes: getNotesStatus(),
-        dashboard: 'complete',
-        about: 'complete'
-    };
 
     const getSteps = () => {
         const steps = [
-            { id: 'general' as TabId, label: 'عامة', status: tabStatusMap.general },
-            { id: 'quran' as TabId, label: 'قرآن', status: tabStatusMap.quran },
-            { id: 'class1' as TabId, label: 'حصة 1', status: tabStatusMap.class1 },
+            { id: 'general' as TabId, label: 'عامة', status: getTabStatus('general') },
+            { id: 'quran' as TabId, label: 'قرآن', status: getTabStatus('quran') },
+            { id: 'class1' as TabId, label: 'حصة 1', status: getTabStatus('class1') },
         ];
 
         if (report.hasSecondClass) {
-            steps.push({ id: 'class2' as TabId, label: 'حصة 2', status: tabStatusMap.class2 });
+            steps.push({ id: 'class2' as TabId, label: 'حصة 2', status: getTabStatus('class2') });
         }
 
-        steps.push({ id: 'notes' as TabId, label: 'ملاحظات', status: tabStatusMap.notes });
-        steps.push({ id: 'dashboard' as TabId, label: 'إحصائيات', status: tabStatusMap.dashboard });
+        steps.push({ id: 'notes' as TabId, label: 'ملاحظات', status: getTabStatus('notes') });
+        steps.push({ id: 'dashboard' as TabId, label: 'إحصائيات', status: 'complete' });
 
         return steps;
     };
 
     const renderGeneralInfo = () => {
-        const isGeneralComplete = tabStatusMap.general === 'complete';
+        const isGeneralComplete = getTabStatus('general') === 'complete';
         const sortedArchive = [...archive].sort((a, b) => b.savedAt - a.savedAt);
 
         return (
@@ -765,7 +293,7 @@ export default function App() {
 
     const renderClassInfo = (classType: 'firstClass' | 'secondClass') => {
         const data = report[classType];
-        const isComplete = getClassStatus(data) === 'complete';
+        const isComplete = getTabStatus(classType === 'firstClass' ? 'class1' : 'class2') === 'complete';
         const label = classType === 'firstClass' ? 'الحصة الأولى' : 'الحصة الثانية';
 
         const toggleAccordion = (section: string) => {
@@ -797,7 +325,7 @@ export default function App() {
                                 onClick={() => setReport(prev => ({ ...prev, hasSecondClass: false }))}
                                 className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-300 
                                     ${!report.hasSecondClass 
-                                        ? 'bg-primary text-white shadow-md transform scale-105' 
+                                        ? 'bg-red-500 text-white shadow-md transform scale-105' 
                                         : 'text-gray-400 hover:bg-gray-200'
                                     }`}
                             >
@@ -812,228 +340,115 @@ export default function App() {
                         <BookOpen size={18} /> {label}
                     </h3>
                     
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-1 gap-3 mb-3">
+                    <div className="space-y-4">
+                        {/* Subject & Lesson */}
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 mb-1">المادة</label>
-                                <select
-                                    value={data.subject}
-                                    onChange={(e) => handleClassChange(classType, 'subject', e.target.value)}
-                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 appearance-none focus:border-primary outline-none"
-                                >
-                                    <option value="">اختر المادة...</option>
-                                    {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-
-                            {/* Gender Selection (Conditional) */}
-                            {report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && (
-                                <div className="animate-fade-in">
-                                    <label className="block text-[10px] font-bold text-gray-500 mb-1">الجنس (لتحديد الدروس)</label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleClassChange(classType, 'gender', 'ذكور')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                                                data.gender === 'ذكور' 
-                                                ? 'bg-blue-50 border-blue-200 text-blue-600 ring-1 ring-blue-100' 
-                                                : 'bg-gray-50 border-gray-200 text-gray-500'
-                                            }`}
-                                        >
-                                            ذكور
-                                        </button>
-                                        <button
-                                            onClick={() => handleClassChange(classType, 'gender', 'إناث')}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                                                data.gender === 'إناث' 
-                                                ? 'bg-pink-50 border-pink-200 text-pink-600 ring-1 ring-pink-100' 
-                                                : 'bg-gray-50 border-gray-200 text-gray-500'
-                                            }`}
-                                        >
-                                            إناث
-                                        </button>
-                                    </div>
+                                <div className="relative">
+                                    <select
+                                        value={data.subject}
+                                        onChange={(e) => handleClassChange(classType, 'subject', e.target.value)}
+                                        className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
+                                    >
+                                        <option value="">اختر...</option>
+                                        {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                                 </div>
-                            )}
-
+                            </div>
                             <div>
-                                <label className="block text-[10px] font-bold text-gray-500 mb-1">الدرس</label>
-                                <select
+                                <label className="block text-[10px] font-bold text-gray-500 mb-1">عنوان الدرس</label>
+                                <input
+                                    type="text"
                                     value={data.lesson}
                                     onChange={(e) => handleClassChange(classType, 'lesson', e.target.value)}
-                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 appearance-none focus:border-primary outline-none"
-                                    disabled={!data.subject || (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && !data.gender)}
-                                >
-                                    <option value="">
-                                        {report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && !data.gender ? "يرجى اختيار الجنس أولاً..." : "اختر الدرس..."}
-                                    </option>
-                                    {getLessonsForSubject(data.subject, report.general.level, data.gender).map(l => (
-                                        <option key={l} value={l}>{l}</option>
-                                    ))}
-                                </select>
+                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 focus:border-primary outline-none"
+                                    placeholder="اكتب العنوان..."
+                                />
                             </div>
                         </div>
 
-                        <div className="h-px bg-gray-100 my-2"></div>
-
-                        <CheckboxGrid
-                            label="استراتيجيات التدريس"
-                            options={appData.strategies}
-                            selected={data.strategies}
-                            onChange={(vals) => handleClassChange(classType, 'strategies', vals)}
-                            isOpen={openAccordion === 'strategies'}
-                            onToggle={() => toggleAccordion('strategies')}
-                        />
-
-                        <CheckboxGrid
-                            label="الوسائل التعليمية"
-                            options={appData.tools}
-                            selected={data.tools}
-                            onChange={(vals) => handleClassChange(classType, 'tools', vals)}
-                            isOpen={openAccordion === 'tools'}
-                            onToggle={() => toggleAccordion('tools')}
-                        />
-
-                        <CheckboxGrid
-                            label="المهام المنجزة"
-                            options={appData.tasks}
-                            selected={data.tasks}
-                            onChange={(vals) => handleClassChange(classType, 'tasks', vals)}
-                            isOpen={openAccordion === 'tasks'}
-                            onToggle={() => toggleAccordion('tasks')}
-                        />
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const renderNotes = () => (
-        <div className="space-y-4 animate-fade-in">
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
-                    <MessageSquare size={18} /> ملاحظات عامة
-                </h3>
-                <textarea
-                    value={report.notes}
-                    onChange={(e) => setReport(prev => ({ ...prev, notes: e.target.value }))}
-                    className="w-full h-32 p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none leading-relaxed"
-                    placeholder="أي ملاحظات إضافية..."
-                ></textarea>
-            </div>
-
-            <button 
-                onClick={saveToArchive}
-                className="w-full py-3 bg-secondary text-white rounded-xl shadow-lg font-bold flex items-center justify-center gap-2 active:scale-95 transition text-sm"
-            >
-                <Save size={18} />
-                حفظ في الأرشيف
-            </button>
-        </div>
-    );
-
-    const renderReports = () => {
-        if (!report.general.level) {
-            return (
-                <div className="animate-fade-in flex flex-col items-center justify-center py-20 text-center text-gray-400">
-                    <AlertCircle size={48} className="mb-4 opacity-50" />
-                    <p>يرجى اختيار المستوى الدراسي أولاً لعرض التقارير.</p>
-                </div>
-            );
-        }
-
-        return (
-            <div className="animate-fade-in space-y-4 pb-20">
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-2 text-primary mb-1">
-                            <TrendingUp size={16} />
-                            <span className="text-[10px] font-bold">معدل الإنجاز</span>
-                        </div>
-                        <div className="text-xl font-bold text-gray-800">78%</div>
-                        <div className="text-[9px] text-green-500">+12% عن الأسبوع الماضي</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-2 text-secondary mb-1">
-                            <Award size={16} />
-                            <span className="text-[10px] font-bold">إجمالي الدروس</span>
-                        </div>
-                        <div className="text-xl font-bold text-gray-800">
-                            {statsData.reduce((acc, curr) => acc + curr.actual, 0)}
-                        </div>
-                        <div className="text-[9px] text-gray-400">درس تم تنفيذه</div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-                    <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <TrendingUp size={18} className="text-primary" />
-                        تقدم المنهج الدراسي
-                    </h3>
-                    
-                    <div className="h-[300px] w-full" dir="ltr">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={statsData} margin={{ top: 20, right: 10, left: -20, bottom: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                {/* Reversed XAxis ensures Quran is on the Right */}
-                                <XAxis 
-                                    dataKey="subject" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={<CustomizedAxisTick />}
-                                    interval={0}
-                                    xAxisId="0"
-                                    reversed
-                                    allowDuplicatedCategory={false}
-                                />
-                                <XAxis 
-                                    dataKey="subject" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    hide
-                                    xAxisId="1"
-                                    reversed
-                                    allowDuplicatedCategory={false}
-                                />
-                                <YAxis 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={{ fill: '#9ca3af', fontSize: 10 }} 
-                                />
-                                <Tooltip 
-                                    cursor={{ fill: '#f9fafb' }}
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                                />
-                                <Bar 
-                                    dataKey="total" 
-                                    fill="#f3f4f6" 
-                                    radius={[6, 6, 6, 6]} 
-                                    barSize={24}
-                                    xAxisId="0"
-                                />
-                                <Bar 
-                                    dataKey="actual" 
-                                    fill="#667eea" 
-                                    radius={[6, 6, 6, 6]} 
-                                    barSize={24}
-                                    xAxisId="1"
-                                >
-                                    <LabelList dataKey="percentage" position="top" fill="#667eea" fontSize={9} fontWeight="bold" />
-                                    {statsData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.actual >= entry.total ? '#10b981' : '#667eea'} />
+                        {/* Gender Selection for Fiqh/4th Grade */}
+                        {report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && (
+                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 animate-fade-in">
+                                <label className="block text-[10px] font-bold text-orange-700 mb-2">جنس الطلاب (مطلوب للفقه - رابعة متوسط)</label>
+                                <div className="flex gap-2">
+                                    {['بنين', 'بنات'].map(g => (
+                                        <button
+                                            key={g}
+                                            onClick={() => handleClassChange(classType, 'gender', g)}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                data.gender === g 
+                                                ? 'bg-orange-500 text-white shadow-md' 
+                                                : 'bg-white text-gray-500 border border-orange-200 hover:bg-orange-100'
+                                            }`}
+                                        >
+                                            {g}
+                                        </button>
                                     ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="flex justify-center gap-6 mt-2 text-[10px] text-gray-500">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-gray-200"></div>
-                            <span>المخطط (المفترض)</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Strategies */}
+                        <div className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button 
+                                onClick={() => toggleAccordion('strategies')}
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
+                            >
+                                <span className="text-xs font-bold text-gray-700">استراتيجيات التدريس</span>
+                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'strategies' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openAccordion === 'strategies' && (
+                                <div className="p-3 bg-white animate-fade-in">
+                                    <CheckboxGrid
+                                        items={appData.strategies}
+                                        selected={data.strategies}
+                                        onChange={(selected) => handleClassChange(classType, 'strategies', selected)}
+                                    />
+                                </div>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
-                            <span>المنفذ (الفعلي)</span>
+
+                        {/* Tools */}
+                        <div className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button 
+                                onClick={() => toggleAccordion('tools')}
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
+                            >
+                                <span className="text-xs font-bold text-gray-700">الوسائل التعليمية</span>
+                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'tools' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openAccordion === 'tools' && (
+                                <div className="p-3 bg-white animate-fade-in">
+                                    <CheckboxGrid
+                                        items={appData.tools}
+                                        selected={data.tools}
+                                        onChange={(selected) => handleClassChange(classType, 'tools', selected)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tasks */}
+                        <div className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button 
+                                onClick={() => toggleAccordion('tasks')}
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
+                            >
+                                <span className="text-xs font-bold text-gray-700">المهام والتكليفات</span>
+                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'tasks' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openAccordion === 'tasks' && (
+                                <div className="p-3 bg-white animate-fade-in">
+                                    <CheckboxGrid
+                                        items={appData.tasks}
+                                        selected={data.tasks}
+                                        onChange={(selected) => handleClassChange(classType, 'tasks', selected)}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1058,10 +473,9 @@ export default function App() {
         return <LoginScreen onLogin={handleLogin} />;
     }
 
+    console.log('✅ App Rendering Main Content');
     return (
         <>
-            {/* Reminder Banner Removed */}
-            
             {/* Connection Status Indicator */}
             {!online && (
                 <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-center py-2 z-50 flex items-center justify-center gap-2">
@@ -1127,54 +541,58 @@ export default function App() {
                     onQrClick={() => setIsQrModalOpen(true)}
                     onAvatarClick={() => setShowAccountModal(true)}
                 />
-                <ProgressStepper 
-                    steps={getSteps()} 
-                    activeTab={activeTab} 
-                    onStepClick={setActiveTab} 
-                />
+                
+                <div className="px-4 pb-6">
+                    <ProgressStepper 
+                        steps={getSteps()} 
+                        currentStep={activeTab} 
+                        onStepClick={setActiveTab} 
+                    />
+                </div>
             </div>
 
-            <main className="px-4 max-w-md mx-auto">
+            <div className="max-w-md mx-auto px-4">
                 {activeTab === 'general' && renderGeneralInfo()}
                 {activeTab === 'quran' && renderQuranInfo()}
                 {activeTab === 'class1' && renderClassInfo('firstClass')}
                 {activeTab === 'class2' && renderClassInfo('secondClass')}
-                {activeTab === 'notes' && renderNotes()}
-                {activeTab === 'dashboard' && <Dashboard teacherName={report.general.name} />}
-                {activeTab === 'about' && <AboutProject />}
-            </main>
+                
+                {activeTab === 'notes' && (
+                    <div className="animate-fade-in bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
+                            <MessageSquare size={18} /> ملاحظات إضافية
+                        </h3>
+                        <textarea
+                            value={report.notes}
+                            onChange={(e) => setReport(prev => ({ ...prev, notes: e.target.value }))}
+                            className="w-full h-32 p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none transition leading-relaxed"
+                            placeholder="اكتب أي ملاحظات إضافية هنا..."
+                        ></textarea>
+                    </div>
+                )}
 
+                {activeTab === 'dashboard' && <Dashboard stats={statsData} />}
+                
+                {activeTab === 'about' && <AboutProject />}
+            </div>
+
+            {/* Bottom Navigation */}
             <BottomNav 
                 activeTab={activeTab} 
-                setActiveTab={setActiveTab}
-                hasSecondClass={report.hasSecondClass}
-                tabStatus={tabStatusMap}
+                onTabChange={setActiveTab}
+                onSave={() => saveToArchive(online, setPendingCount)}
+                isFormComplete={getTabStatus('general') === 'complete' && getTabStatus('class1') === 'complete'}
             />
 
+            {/* QR Code Modal */}
             {isQrModalOpen && (
-                <div 
-                    className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
-                    onClick={() => setIsQrModalOpen(false)}
-                >
-                    <div 
-                        className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl transform scale-100 transition-transform"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="text-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-800">إثبات الحضور</h3>
-                            <p className="text-gray-500 text-xs mt-1">امسح الرمز لتسجيل بيانات الحصة</p>
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setIsQrModalOpen(false)}>
+                    <div className="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center animate-scale-in" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-primary mb-4">رمز QR الخاص بك</h3>
+                        <div className="bg-white p-2 rounded-xl border-2 border-dashed border-gray-200 mb-4">
+                            <img src={qrDataUrl} alt="QR Code" className="w-full h-auto rounded-lg" />
                         </div>
-                        
-                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-center mb-6">
-                            {qrDataUrl ? (
-                                <img src={qrDataUrl} alt="QR Code" className="w-64 h-64 object-contain mix-blend-multiply" />
-                            ) : (
-                                <div className="w-64 h-64 flex items-center justify-center text-gray-300">
-                                    <RefreshCw className="animate-spin" />
-                                </div>
-                            )}
-                        </div>
-
+                        <p className="text-sm text-gray-500 mb-6">امسح الرمز لمشاركة بياناتك</p>
                         <button 
                             onClick={() => setIsQrModalOpen(false)}
                             className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition"
