@@ -582,6 +582,8 @@ export default function App() {
                 onTabChange={setActiveTab}
                 onSave={() => saveToArchive(online, setPendingCount)}
                 isFormComplete={getTabStatus('general') === 'complete' && getTabStatus('class1') === 'complete'}
+                hasSecondClass={report.hasSecondClass}
+                tabStatus={getTabStatus}
             />
 
             {/* QR Code Modal */}
