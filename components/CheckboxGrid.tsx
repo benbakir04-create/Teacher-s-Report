@@ -11,8 +11,8 @@ interface CheckboxGridProps {
 }
 
 export const CheckboxGrid: React.FC<CheckboxGridProps> = ({ 
-    options, 
-    selected, 
+    options = [], 
+    selected = [], 
     onChange, 
     label, 
     isOpen, 
