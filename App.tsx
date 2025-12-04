@@ -325,7 +325,7 @@ export default function App() {
                                 onClick={() => setReport(prev => ({ ...prev, hasSecondClass: false }))}
                                 className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-300 
                                     ${!report.hasSecondClass 
-                                        ? 'bg-red-500 text-white shadow-md transform scale-105' 
+                                        ? 'bg-secondary text-white shadow-md transform scale-105' 
                                         : 'text-gray-400 hover:bg-gray-200'
                                     }`}
                             >
@@ -342,7 +342,7 @@ export default function App() {
                     
                     <div className="space-y-4">
                         {/* Subject & Lesson */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-[2fr_3fr] gap-3">
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 mb-1">المادة</label>
                                 <div className="relative">
@@ -371,85 +371,58 @@ export default function App() {
 
                         {/* Gender Selection for Fiqh/4th Grade */}
                         {report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && (
-                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 animate-fade-in">
-                                <label className="block text-[10px] font-bold text-orange-700 mb-2">جنس الطلاب (مطلوب للفقه - رابعة متوسط)</label>
+                            <div className="bg-gradient-to-r from-blue-50 to-pink-50 p-3 rounded-xl border border-gray-100 animate-fade-in">
+                                <label className="block text-[10px] font-bold text-gray-600 mb-2">جنس الطلاب (مطلوب للفقه - رابعة متوسط)</label>
                                 <div className="flex gap-2">
-                                    {['بنين', 'بنات'].map(g => (
-                                        <button
-                                            key={g}
-                                            onClick={() => handleClassChange(classType, 'gender', g)}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                                                data.gender === g 
-                                                ? 'bg-orange-500 text-white shadow-md' 
-                                                : 'bg-white text-gray-500 border border-orange-200 hover:bg-orange-100'
-                                            }`}
-                                        >
-                                            {g}
-                                        </button>
-                                    ))}
+                                    <button
+                                        onClick={() => handleClassChange(classType, 'gender', 'بنين')}
+                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                            data.gender === 'بنين' 
+                                            ? 'bg-emerald-500 text-white shadow-md' 
+                                            : 'bg-white text-gray-500 border border-emerald-200 hover:bg-emerald-50'
+                                        }`}
+                                    >
+                                        <span>ذكور</span>
+                                        <span className="text-[9px] opacity-70">فقه المعاملات</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleClassChange(classType, 'gender', 'بنات')}
+                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                            data.gender === 'بنات' 
+                                            ? 'bg-pink-400 text-white shadow-md' 
+                                            : 'bg-white text-gray-500 border border-pink-200 hover:bg-pink-50'
+                                        }`}
+                                    >
+                                        <span>إناث</span>
+                                        <span className="text-[9px] opacity-70">فقه النساء</span>
+                                    </button>
                                 </div>
                             </div>
                         )}
 
                         {/* Strategies */}
-                        <div className="border border-gray-100 rounded-xl overflow-hidden">
-                            <button 
-                                onClick={() => toggleAccordion('strategies')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
-                            >
-                                <span className="text-xs font-bold text-gray-700">استراتيجيات التدريس</span>
-                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'strategies' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openAccordion === 'strategies' && (
-                                <div className="p-3 bg-white animate-fade-in">
-                                    <CheckboxGrid
-                                        items={appData.strategies}
-                                        selected={data.strategies}
-                                        onChange={(selected) => handleClassChange(classType, 'strategies', selected)}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        <CheckboxGrid
+                            items={appData.strategies}
+                            selected={data.strategies}
+                            onChange={(selected) => handleClassChange(classType, 'strategies', selected)}
+                            label="استراتيجيات التدريس"
+                        />
 
                         {/* Tools */}
-                        <div className="border border-gray-100 rounded-xl overflow-hidden">
-                            <button 
-                                onClick={() => toggleAccordion('tools')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
-                            >
-                                <span className="text-xs font-bold text-gray-700">الوسائل التعليمية</span>
-                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'tools' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openAccordion === 'tools' && (
-                                <div className="p-3 bg-white animate-fade-in">
-                                    <CheckboxGrid
-                                        items={appData.tools}
-                                        selected={data.tools}
-                                        onChange={(selected) => handleClassChange(classType, 'tools', selected)}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        <CheckboxGrid
+                            items={appData.tools}
+                            selected={data.tools}
+                            onChange={(selected) => handleClassChange(classType, 'tools', selected)}
+                            label="الوسائل التعليمية"
+                        />
 
                         {/* Tasks */}
-                        <div className="border border-gray-100 rounded-xl overflow-hidden">
-                            <button 
-                                onClick={() => toggleAccordion('tasks')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition"
-                            >
-                                <span className="text-xs font-bold text-gray-700">المهام والتكليفات</span>
-                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${openAccordion === 'tasks' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openAccordion === 'tasks' && (
-                                <div className="p-3 bg-white animate-fade-in">
-                                    <CheckboxGrid
-                                        items={appData.tasks}
-                                        selected={data.tasks}
-                                        onChange={(selected) => handleClassChange(classType, 'tasks', selected)}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        <CheckboxGrid
+                            items={appData.tasks}
+                            selected={data.tasks}
+                            onChange={(selected) => handleClassChange(classType, 'tasks', selected)}
+                            label="المهام المنجزة"
+                        />
                     </div>
                 </div>
             </div>

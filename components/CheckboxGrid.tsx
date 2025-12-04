@@ -1,23 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CheckboxGridProps {
-    options: string[];
-    selected: string[];
+    items?: string[];
+    options?: string[];
+    selected?: string[];
     onChange: (selected: string[]) => void;
-    label: string;
-    isOpen: boolean;
-    onToggle: () => void;
+    label?: string;
+    isOpen?: boolean;
+    onToggle?: () => void;
 }
 
 export const CheckboxGrid: React.FC<CheckboxGridProps> = ({ 
-    options = [], 
+    items,
+    options,
     selected = [], 
     onChange, 
-    label, 
-    isOpen, 
-    onToggle 
+    label,
+    isOpen: externalIsOpen,
+    onToggle: externalOnToggle
 }) => {
+    // Support both 'items' and 'options' props
+    const optionsList = items || options || [];
+    
+    // Internal state for when component manages its own open state
+    const [internalIsOpen, setInternalIsOpen] = useState(false);
+    const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+    const onToggle = externalOnToggle || (() => setInternalIsOpen(prev => !prev));
+    
     const toggleOption = (option: string) => {
         if (selected.includes(option)) {
             onChange(selected.filter(item => item !== option));
@@ -26,79 +36,76 @@ export const CheckboxGrid: React.FC<CheckboxGridProps> = ({
         }
     };
 
-    // Calculate summary text
-    const summaryText = selected.length > 0 
-        ? selected.join('، ') 
-        : 'لم يتم تحديد خيارات';
+    // Compact chip-style display for selected items
+    const renderSelectedChips = () => {
+        if (selected.length === 0) return null;
+        return (
+            <div className="flex flex-wrap gap-1 mt-2">
+                {selected.map(item => (
+                    <span 
+                        key={item}
+                        onClick={(e) => { e.stopPropagation(); toggleOption(item); }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-medium rounded-full cursor-pointer hover:bg-primary/20 transition"
+                    >
+                        {item}
+                        <span className="text-primary/60 hover:text-red-500">×</span>
+                    </span>
+                ))}
+            </div>
+        );
+    };
 
     return (
-        <div className={`bg-white border rounded-xl transition-all duration-300 overflow-hidden mb-4 ${isOpen ? 'border-primary shadow-md' : 'border-gray-200 shadow-sm'}`}>
-            {/* Header - Always Visible */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            {/* Header */}
             <button 
                 onClick={onToggle}
-                className={`w-full flex items-center justify-between p-4 text-right transition-colors duration-200 
-                    ${isOpen ? 'bg-primary/5' : 'bg-white hover:bg-gray-50'}
+                className={`w-full flex items-center justify-between p-3 text-right transition-colors duration-200 
+                    ${isOpen ? 'bg-primary/5 border-b border-gray-100' : 'hover:bg-gray-50'}
                 `}
             >
-                <div className="flex flex-col items-start gap-1">
-                    <span className={`text-sm font-bold ${isOpen ? 'text-primary' : 'text-gray-700'}`}>
-                        {label}
-                    </span>
-                    {!isOpen && (
-                        <span className="text-xs text-gray-400 truncate max-w-[200px] sm:max-w-xs">
-                            {selected.length > 0 ? `${selected.length} خيارات محددة` : 'اضغط للاختيار'}
+                <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                        <span className={`text-sm font-bold ${isOpen ? 'text-primary' : 'text-gray-700'}`}>
+                            {label || 'اختر الخيارات'}
                         </span>
-                    )}
+                        {selected.length > 0 && (
+                            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-primary text-white text-[10px] font-bold rounded-full">
+                                {selected.length}
+                            </span>
+                        )}
+                    </div>
+                    {!isOpen && renderSelectedChips()}
                 </div>
-
-                <div className="flex items-center gap-3">
-                    {selected.length > 0 && (
-                        <span className="flex items-center justify-center w-6 h-6 bg-primary text-white text-xs font-bold rounded-full">
-                            {selected.length}
-                        </span>
-                    )}
-                    {isOpen ? <ChevronUp size={18} className="text-primary" /> : <ChevronDown size={18} className="text-gray-400" />}
-                </div>
+                
+                {isOpen ? <ChevronUp size={16} className="text-primary flex-shrink-0" /> : <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />}
             </button>
 
             {/* Body - Collapsible */}
-            <div 
-                className={`transition-all duration-300 ease-in-out overflow-hidden
-                    ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}
-                `}
-            >
-                <div className="p-4 pt-0 border-t border-gray-100 bg-white">
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                        {options.map(option => {
+            {isOpen && (
+                <div className="p-3 bg-white max-h-[200px] overflow-y-auto">
+                    <div className="flex flex-wrap gap-2">
+                        {optionsList.map(option => {
                             const isSelected = selected.includes(option);
                             return (
-                                <div
+                                <button
                                     key={option}
                                     onClick={() => toggleOption(option)}
-                                    className={`relative cursor-pointer p-3 rounded-xl border-2 transition-all duration-200 flex items-center justify-between group
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border
                                         ${isSelected 
-                                            ? 'border-primary bg-blue-50 text-primary shadow-sm' 
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                            ? 'bg-primary text-white border-primary shadow-sm' 
+                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary hover:bg-primary/5'
                                         }
                                     `}
                                 >
-                                    <span className="text-xs font-medium leading-tight">{option}</span>
-                                    <div className={`w-5 h-5 rounded-full flex flex-shrink-0 items-center justify-center border transition-colors
-                                        ${isSelected ? 'bg-primary border-primary' : 'border-gray-300 group-hover:border-gray-400'}
-                                    `}>
-                                        {isSelected && <Check size={12} className="text-white" />}
-                                    </div>
-                                </div>
+                                    {isSelected && <Check size={12} className="inline mr-1" />}
+                                    {option}
+                                </button>
                             );
                         })}
                     </div>
-                    
-                    {/* Summary Footer when open */}
-                    <div className="mt-4 pt-3 border-t border-dashed border-gray-200 text-xs text-gray-500 flex justify-between items-center">
-                         <span>تم تحديد: {summaryText}</span>
-                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
