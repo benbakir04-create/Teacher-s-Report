@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { X, LogOut, RefreshCw, Camera, User } from 'lucide-react';
 import { TeacherData } from '../services/teacherService';
 import { getOrCreateFingerprint } from '../services/deviceService';
+import { GoogleLinkButton } from './GoogleAuth';
 
 interface AccountModalProps {
     isOpen: boolean;
@@ -125,6 +126,27 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                     {/* Actions */}
                     <div className="space-y-3">
+                        {/* Link Google Account if not linked */}
+                        {!teacher?.email && (
+                            <div className="space-y-2">
+                                <div className="p-3 bg-blue-50 text-blue-700 rounded-xl text-xs text-center border border-blue-100 mb-2">
+                                    حسابك غير مربوط ببريد إلكتروني. اربطه الآن لتتمكن من الدخول من أجهزة أخرى.
+                                </div>
+                                <div className="flex justify-center w-full overflow-hidden">
+                                     <GoogleLinkButton
+                                        mode="link"
+                                        onSuccess={() => {
+                                            alert('تم ربط الحساب بنجاح! سيتم إعادة تحميل التطبيق.');
+                                            window.location.reload();
+                                        }}
+                                        onError={(err) => {
+                                            alert(err || 'فشل ربط الحساب');
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Security: Reset Sessions */}
                         {teacher?.email && (
                              <button
