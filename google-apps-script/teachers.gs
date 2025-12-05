@@ -57,30 +57,37 @@ function getTeacherByRegistrationId(registrationId) {
 }
 
 /**
- * Validate device fingerprint
+ * Validate device fingerprint (Supports Multi-Device)
  */
 function validateDevice(registrationId, deviceFingerprint) {
   const result = getTeacherByRegistrationId(registrationId);
-  
+
   if (!result.success) {
     logError("Security Check", `Teacher not found: ${registrationId}`);
     return { valid: false, error: "Teacher not found" };
   }
 
-  const storedFingerprint = result.teacher.deviceFingerprint;
+  const storedValue = result.teacher.deviceFingerprint || "";
 
   // Allow if no fingerprint is stored (First use)
-  if (!storedFingerprint) {
-    return { valid: true };
+  if (!storedValue) {
+    return { valid: true }; // Will be saved on next update
   }
 
-  // Check for exact match
-  if (storedFingerprint === deviceFingerprint) {
+  // Split stored fingerprints by comma to support multiple devices
+  // Clean up whitespace just in case
+  const storedFingerprints = storedValue.split(",").map((f) => f.trim());
+
+  // Check if current device is in the list
+  if (storedFingerprints.includes(deviceFingerprint)) {
     return { valid: true };
   }
 
   // Security violation
-  logError("Security Violation", `Device mismatch for ${registrationId}. Stored: ${storedFingerprint}, Provided: ${deviceFingerprint}`);
+  logError(
+    "Security Violation",
+    `Device mismatch for ${registrationId}. Stored: [${storedValue}], Provided: ${deviceFingerprint}`
+  );
   return { valid: false, error: "Device fingerprint mismatch" };
 }
 
@@ -147,22 +154,10 @@ function updateTeacherData(registrationId, updates, deviceFingerprint) {
 }
 
 /**
- * Update device fingerprint - Secured
- * NOTE: This prevents device switching without clearing the field first via Admin/Email flow
+ * Update device fingerprint - Secured with Multi-Device Support
+ * Adds new device to the list (Max 3 devices)
  */
 function updateDeviceFingerprint(registrationId, deviceFingerprint) {
-  // Check if teacher exists only - we can't validate device because we are updating it!
-  // BUT logic demands we validate 'something'. 
-  // For 'Security Hardening', we should NOT allow overwriting an existing fingerprint freely.
-  // We check against the stored one. If stored is present and different => Violation.
-  
-  const security = validateDevice(registrationId, deviceFingerprint);
-  // If stored was empty, valid=true. If stored matches provided, valid=true.
-  // If stored differs => Mismatch => Return Error.
-  if (!security.valid) {
-    return { success: false, error: "Cannot overwrite existing device fingerprint. Contact Admin." };
-  }
-
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(TEACHERS_SHEET_NAME);
 
@@ -180,7 +175,32 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
   // Find and update teacher row
   for (let i = 1; i < data.length; i++) {
     if (data[i][idCol] == registrationId) {
-      sheet.getRange(i + 1, deviceCol + 1).setValue(deviceFingerprint);
+      const currentStored = ((data[i][deviceCol] || "") + "").toString();
+      let newStoredValue = currentStored;
+
+      // Split existing to array
+      let devices = currentStored
+        ? currentStored.split(",").map((s) => s.trim())
+        : [];
+
+      // If device already exists, success (nothing to do)
+      if (devices.includes(deviceFingerprint)) {
+        return { success: true };
+      }
+
+      // Add new device
+      devices.push(deviceFingerprint);
+
+      // Limit to 3 devices (FIFO - First In First Out if needed, or strict limit)
+      // Here: Strict limit. If > 3, we can remove oldest or Refuse.
+      // Let's implement FIFO (Remove the first one) to stay user friendly but secure against spam
+      if (devices.length > 3) {
+        devices.shift(); // Remove the oldest device
+      }
+
+      newStoredValue = devices.join(",");
+
+      sheet.getRange(i + 1, deviceCol + 1).setValue(newStoredValue);
       return { success: true };
     }
   }
@@ -203,23 +223,39 @@ function doPost(e) {
 
     // الحصول على الملف النشط
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
+
     // بيانات الأمان (قد تكون غير موجودة في بعض الطلبات القديمة)
-    const registrationId = data.registrationId || (data.auth ? data.auth.registrationId : null);
-    const deviceFingerprint = data.deviceFingerprint || (data.auth ? data.auth.deviceFingerprint : null);
+    const registrationId =
+      data.registrationId || (data.auth ? data.auth.registrationId : null);
+    const deviceFingerprint =
+      data.deviceFingerprint ||
+      (data.auth ? data.auth.deviceFingerprint : null);
 
     // --- معالجة إضافة البيانات (للتقارير) ---
     if (action === "appendToSheet") {
       // Security Check for Reports
-      if (data.range.startsWith("التقارير") || data.range.startsWith("Reports")) {
-         if (!registrationId || !deviceFingerprint) {
-             logError("Security Block", "Attempt to write report without auth credentials");
-             return output.setContent(JSON.stringify({ success: false, error: "Missing authentication credentials" }));
-         }
-         const security = validateDevice(registrationId, deviceFingerprint);
-         if (!security.valid) {
-             return output.setContent(JSON.stringify({ success: false, error: security.error }));
-         }
+      if (
+        data.range.startsWith("التقارير") ||
+        data.range.startsWith("Reports")
+      ) {
+        if (!registrationId || !deviceFingerprint) {
+          logError(
+            "Security Block",
+            "Attempt to write report without auth credentials"
+          );
+          return output.setContent(
+            JSON.stringify({
+              success: false,
+              error: "Missing authentication credentials",
+            })
+          );
+        }
+        const security = validateDevice(registrationId, deviceFingerprint);
+        if (!security.valid) {
+          return output.setContent(
+            JSON.stringify({ success: false, error: security.error })
+          );
+        }
       }
 
       const range = data.range;
@@ -280,22 +316,24 @@ function doPost(e) {
           message: "Data added successfully",
         })
       );
-    } 
-    
+    }
+
     // --- معالجة بيانات المعلمين ---
     else if (action === "getTeacherByRegistrationId") {
       return ContentService.createTextOutput(
         JSON.stringify(getTeacherByRegistrationId(data.registrationId))
       ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    else if (action === "updateTeacherData") {
+    } else if (action === "updateTeacherData") {
       return ContentService.createTextOutput(
-        JSON.stringify(updateTeacherData(data.registrationId, data.updates, deviceFingerprint))
+        JSON.stringify(
+          updateTeacherData(
+            data.registrationId,
+            data.updates,
+            deviceFingerprint
+          )
+        )
       ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    else if (action === "linkTeacherEmail") {
+    } else if (action === "linkTeacherEmail") {
       return ContentService.createTextOutput(
         JSON.stringify(
           linkTeacherEmail(
@@ -305,17 +343,13 @@ function doPost(e) {
           )
         )
       ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    else if (action === "updateDeviceFingerprint") {
+    } else if (action === "updateDeviceFingerprint") {
       return ContentService.createTextOutput(
         JSON.stringify(
           updateDeviceFingerprint(data.registrationId, data.deviceFingerprint)
         )
       ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    else {
+    } else {
       return output.setContent(
         JSON.stringify({
           success: false,
