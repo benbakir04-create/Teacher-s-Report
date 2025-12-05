@@ -58,8 +58,9 @@ export async function loginWithRegistrationId(registrationId: string): Promise<A
     // Check if teacher has email linked
     const isLinked = !!teacher.email;
     
-    // Check device match
-    const deviceMatches = teacher.deviceFingerprint === currentFingerprint;
+    // Check device match (Supports Multi-Device)
+    const storedFingerprints = (teacher.deviceFingerprint || '').split(',').map(s => s.trim());
+    const deviceMatches = storedFingerprints.includes(currentFingerprint);
     
     // If email linked but device doesn't match, throw error (requires Google Sign-In)
     if (isLinked && !deviceMatches) {
