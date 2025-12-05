@@ -215,6 +215,10 @@ export async function resetDeviceFingerprints(
         }
 
         const data = await response.json();
+        // Server might return 'error' or 'message' in case of failure
+        if (!data.success && !data.error && data.message) {
+            data.error = data.message;
+        }
         return data; // Returns { success: true/false, error: ... }
     } catch (error) {
         console.error('Error resetting devices:', error);
