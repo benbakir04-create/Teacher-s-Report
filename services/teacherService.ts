@@ -190,10 +190,10 @@ export async function updateDeviceFingerprint(
 export async function resetDeviceFingerprints(
     registrationId: string,
     currentFingerprint: string
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string }> {
     if (!WEBAPP_URL) {
         console.warn('No Web App URL configured');
-        return false;
+        return { success: false, error: 'Configuration Error' };
     }
 
     try {
@@ -215,10 +215,10 @@ export async function resetDeviceFingerprints(
         }
 
         const data = await response.json();
-        return data.success;
+        return data; // Returns { success: true/false, error: ... }
     } catch (error) {
         console.error('Error resetting devices:', error);
-        return false;
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 

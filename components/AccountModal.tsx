@@ -51,12 +51,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             // Import dynamically to avoid circular dependencies if any (though here it's fine)
             const { resetDeviceFingerprints } = await import('../services/teacherService');
             
-            const success = await resetDeviceFingerprints(teacher.registrationId, currentFingerprint);
+            const response = await resetDeviceFingerprints(teacher.registrationId, currentFingerprint);
             
-            if (success) {
+            if (response.success) {
                 alert('تم تسجيل الخروج من جميع الأجهزة الأخرى بنجاح.');
             } else {
-                alert('حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.');
+                alert(`حدث خطأ: ${response.error || 'يرجى المحاولة لاحقاً'}`);
             }
         }
     };
