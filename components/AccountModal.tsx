@@ -176,16 +176,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                 </div>
 
-                {/* Debug Info (Auto-hidden in production usually, but visible now for diagnosis) */}
-                <div className="bg-gray-50 p-4 text-[10px] font-mono text-gray-500 break-all border-t border-gray-100">
-                    <p><strong>Client ID:</strong> {getOrCreateFingerprint().fingerprint.substring(0, 15)}...</p>
-                    <p className="mt-1"><strong>Server IDs:</strong> {teacher?.deviceFingerprint || 'None'}</p>
-                    <p className="mt-1 text-xs text-blue-500">
-                        {teacher?.deviceFingerprint?.includes(getOrCreateFingerprint().fingerprint) 
-                            ? '✅ Match' 
-                            : '❌ Mismatch'}
-                    </p>
-                </div>
             </div>
         </div>
     );
