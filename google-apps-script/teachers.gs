@@ -209,6 +209,64 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
 }
 
 /**
+ * Link teacher email and device
+ * This is the "Bootstrapping" function - allows setting email for the first time
+ */
+function linkTeacherEmail(registrationId, email, deviceFingerprint) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(TEACHERS_SHEET_NAME);
+
+  if (!sheet) {
+    return { success: false, error: "Teachers sheet not found" };
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idCol = headers.indexOf("رقم التسجيل");
+  const emailCol = headers.indexOf("البريد الإلكتروني");
+  const deviceCol = headers.indexOf("بصمة الجهاز");
+  const linkDateCol = headers.indexOf("تاريخ الربط");
+  const emailRequiredCol = headers.indexOf("إلزامية البريد");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol] == registrationId) {
+      // Check if already linked to a DIFFERENT email
+      if (data[i][emailCol] && data[i][emailCol] !== email) {
+        return {
+          success: false,
+          error: "Teacher already linked to another email",
+        };
+      }
+
+      // Update Email
+      sheet.getRange(i + 1, emailCol + 1).setValue(email);
+
+      // Update Device Fingerprint (Append if multiple, or set if first)
+      // For bootstrapping, we add this device as trusted
+      const currentDevices = data[i][deviceCol]
+        ? data[i][deviceCol].toString().split(",")
+        : [];
+      if (!currentDevices.includes(deviceFingerprint)) {
+        if (currentDevices.length >= 3) currentDevices.shift(); // FIFO
+        currentDevices.push(deviceFingerprint);
+        sheet.getRange(i + 1, deviceCol + 1).setValue(currentDevices.join(","));
+      }
+
+      // Update Link Date
+      sheet.getRange(i + 1, linkDateCol + 1).setValue(new Date().toISOString());
+
+      // Enforce email requirement from now on
+      sheet.getRange(i + 1, emailRequiredCol + 1).setValue("نعم");
+
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: "Teacher not found" };
+}
+
+/**
  * Reset device fingerprints - Keeps only the provided one (Kill Switch)
  */
 function resetDeviceFingerprints(registrationId, currentFingerprint) {
