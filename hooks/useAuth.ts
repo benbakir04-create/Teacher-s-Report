@@ -54,8 +54,11 @@ export function useAuth() {
     };
 
     const handleLogout = () => {
+        // Only clear local app session, don't sign out from Google globally
+        // This preserves Google login in other tabs (like Google Sheets)
         authLogout();
-        googleLogout();
+        // Note: We intentionally do NOT call googleLogout() here
+        // googleLogout() would sign the user out of Google entirely
         setAuthSession(null);
         setShowAccountModal(false);
         toast.success('تم تسجيل الخروج بنجاح');

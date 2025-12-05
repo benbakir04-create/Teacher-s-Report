@@ -198,7 +198,8 @@ export function getCurrentSession(): AuthSession | null {
  */
 export function logout(): void {
     clearTeacherData();
-    localStorage.removeItem('device_fingerprint');
+    // Note: We intentionally keep 'device_fingerprint' in localStorage
+    // This allows the user to login again on the same device without Google verification
     localStorage.removeItem('last_reminder_dismiss');
 }
 
