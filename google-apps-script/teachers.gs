@@ -205,6 +205,11 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
     }
   }
 
+  }
+
+  return { success: false, error: "Teacher not found" };
+}
+
 /**
  * Reset device fingerprints - Keeps only the provided one (Kill Switch)
  */
