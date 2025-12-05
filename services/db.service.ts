@@ -24,11 +24,15 @@ class DBService {
     private db: IDBDatabase | null = null;
     private initPromise: Promise<void> | null = null;
 
-    constructor() {
-        this.init();
-    }
+    // Removed constructor call - initialization is now lazy
 
     async init(): Promise<void> {
+        // Only run in browser environment
+        if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+            console.warn('IndexedDB not available (non-browser environment)');
+            return Promise.resolve();
+        }
+        
         if (this.initPromise) return this.initPromise;
 
         this.initPromise = new Promise((resolve, reject) => {
