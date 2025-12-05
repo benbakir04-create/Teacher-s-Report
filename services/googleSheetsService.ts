@@ -14,6 +14,8 @@ const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 
+import { dbService } from './db.service';
+
 /**
  * قراءة البيانات من نطاق محدد في الورقة
  */
@@ -310,17 +312,83 @@ export async function saveReport(report: any): Promise<void> {
       report.notes || ''
     ];
     
+
     // Get device fingerprint for security
     const deviceFingerprint = localStorage.getItem('device_fingerprint') || '';
     
-    await appendToSheet('التقارير!A:V', [row], {
-      registrationId: report.general.id,
-      deviceFingerprint
-    });
+    // 1. Save locally to IndexedDB
+    await dbService.saveReport(report);
+
+    // 2. Prepare payload for sync
+    const payload = {
+      action: 'appendToSheet',
+      range: 'التقارير!A:V',
+      values: [row],
+      auth: {
+        registrationId: report.general.id,
+        deviceFingerprint
+      }
+    };
+
+    // 3. Add to Sync Queue
+    await dbService.addToSyncQueue(payload);
+
+    // 4. Trigger Sync (Background)
+    // We don't await this, so the UI returns immediately
+    processSyncQueue().catch(console.error);
+
   } catch (error) {
-    console.error('Error saving report:', error);
+    console.error('Error saving report locally:', error);
     throw error;
   }
+}
+
+/**
+ * Process Sync Queue (Background Worker)
+ */
+export async function processSyncQueue(): Promise<void> {
+    if (!navigator.onLine) return;
+
+    try {
+        const queue = await dbService.getPendingSyncItems();
+        if (queue.length === 0) return;
+
+        console.log(`🔄 Processing ${queue.length} pending items...`);
+
+        const webAppUrl = import.meta.env.VITE_GOOGLE_WEBAPP_URL;
+        if (!webAppUrl) return;
+
+        for (const item of queue) {
+            try {
+                // Determine if we should retry based on backoff strategies if needed
+                // For now, simple retry
+                
+                const response = await fetch(webAppUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(item.payload)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log(`✅ Synced item ${item.id}`);
+                        await dbService.removeSyncItem(item.id);
+                    } else {
+                        console.error(`❌ Sync failed for ${item.id}:`, result.error);
+                        // Optional: Mark as failed or increment retry count
+                    }
+                } else {
+                     console.error(`❌ Network error for ${item.id}: ${response.statusText}`);
+                }
+            } catch (err) {
+                console.error(`❌ Error syncing item ${item.id}:`, err);
+            }
+        }
+    } catch (error) {
+        console.error('Error processing sync queue:', error);
+    }
 }
 
 /**
@@ -331,10 +399,10 @@ export async function saveBackup(data: any): Promise<void> {
     const timestamp = new Date().toISOString();
     const row = [timestamp, JSON.stringify(data)];
     
+    // Direct append for backup (less critical)
     await appendToSheet('النسخ_الاحتياطي!A:B', [row]);
   } catch (error) {
     console.error('Error saving backup:', error);
-    // لا نريد أن يفشل الحفظ بسبب فشل النسخة الاحتياطية
   }
 }
 
@@ -347,6 +415,7 @@ export async function logError(context: string, error: any): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const row = [timestamp, context, errorMessage];
     
+    // Direct append for errors (fire and forget)
     await appendToSheet('الأخطاء!A:C', [row]);
   } catch (err) {
     console.error('Error logging error:', err);

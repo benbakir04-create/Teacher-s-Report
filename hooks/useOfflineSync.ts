@@ -2,39 +2,55 @@ import { useState, useEffect } from 'react';
 import { 
     isOnline, 
     setupConnectionListeners, 
-    syncPendingReports, 
-    getPendingReports, 
     registerServiceWorker,
     clearAppCache as clearCacheService
 } from '../services/offlineService';
+import { dbService } from '../services/db.service';
+import { processSyncQueue } from '../services/googleSheetsService';
 
 export function useOfflineSync() {
     const [online, setOnline] = useState(isOnline());
     const [pendingCount, setPendingCount] = useState(0);
 
+    // Initial Load & Polling for Pending Count
     useEffect(() => {
-        console.log('🚀 App Version: 1.3.0 - Refactored Hooks'); 
-        // Register Service Worker for PWA
+        console.log('🚀 App Version: 1.4.0 - Offline Layer (IndexedDB)'); 
         registerServiceWorker();
-        
-        // Setup connection listeners
+
+        // Function to update count from DB
+        const updateCount = async () => {
+            try {
+                const count = await dbService.getPendingCount();
+                setPendingCount(count);
+            } catch (e) {
+                console.error('Error getting pending count:', e);
+            }
+        };
+
+        // Initial check
+        updateCount();
+
+        // Listen for online status
         setupConnectionListeners(
             () => {
                 setOnline(true);
-                syncPendingReports().then(() => {
-                    setPendingCount(getPendingReports().length);
-                });
+                console.log('🌐 Online: Triggering sync queue...');
+                processSyncQueue().then(() => updateCount());
             },
-            () => setOnline(false)
+            () => {
+                setOnline(false);
+            }
         );
 
-        // Check pending reports count
-        setPendingCount(getPendingReports().length);
-        
-        // Try to sync pending reports
+        // Try to sync if already online
         if (isOnline()) {
-            syncPendingReports();
+            processSyncQueue().then(() => updateCount());
         }
+
+        // Poll every 5 seconds to update count (in case user saves new report)
+        const interval = setInterval(updateCount, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const handleClearCache = () => {
