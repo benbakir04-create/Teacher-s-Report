@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { X, LogOut, RefreshCw, Camera, User } from 'lucide-react';
 import { TeacherData } from '../services/teacherService';
+import { getOrCreateFingerprint } from '../services/deviceService';
 
 interface AccountModalProps {
     isOpen: boolean;
@@ -45,7 +46,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         if (!teacher) return;
         
         if (confirm('هل أنت متأكد؟ سيتم تسجيل الخروج من جميع الأجهزة الأخرى المتصلة بحسابك فوراً.')) {
-            const currentFingerprint = localStorage.getItem('device_fingerprint');
+            const deviceData = getOrCreateFingerprint();
+            const currentFingerprint = deviceData.fingerprint;
             if (!currentFingerprint) return;
 
             // Import dynamically to avoid circular dependencies if any (though here it's fine)
@@ -154,10 +156,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                 {/* Debug Info (Auto-hidden in production usually, but visible now for diagnosis) */}
                 <div className="bg-gray-50 p-4 text-[10px] font-mono text-gray-500 break-all border-t border-gray-100">
-                    <p><strong>Client ID:</strong> {localStorage.getItem('device_fingerprint') || 'None'}</p>
+                    <p><strong>Client ID:</strong> {getOrCreateFingerprint().fingerprint.substring(0, 15)}...</p>
                     <p className="mt-1"><strong>Server IDs:</strong> {teacher?.deviceFingerprint || 'None'}</p>
                     <p className="mt-1 text-xs text-blue-500">
-                        {teacher?.deviceFingerprint?.includes(localStorage.getItem('device_fingerprint') || 'INVALID') 
+                        {teacher?.deviceFingerprint?.includes(getOrCreateFingerprint().fingerprint) 
                             ? '✅ Match' 
                             : '❌ Mismatch'}
                     </p>

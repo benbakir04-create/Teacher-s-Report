@@ -20,6 +20,8 @@ export interface TeacherData {
     linkDate?: string;
 }
 
+import { getOrCreateFingerprint } from './deviceService';
+
 const WEBAPP_URL = import.meta.env.VITE_GOOGLE_WEBAPP_URL;
 
 /**
@@ -78,8 +80,9 @@ export async function updateTeacherData(
     }
 
     try {
-        // Get device fingerprint
-        const storedFingerprint = localStorage.getItem('device_fingerprint');
+        // Get device fingerprint using service (handles JSON parsing correctly)
+        const deviceData = getOrCreateFingerprint();
+        const storedFingerprint = deviceData.fingerprint;
         
         const response = await fetch(WEBAPP_URL, {
             method: 'POST',

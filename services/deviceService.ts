@@ -62,10 +62,20 @@ export function getStoredFingerprint(): DeviceFingerprint | null {
     if (!stored) return null;
     
     try {
-        return JSON.parse(stored);
-    } catch {
-        return null;
+        const parsed = JSON.parse(stored);
+        // Ensure it has the expected structure
+        if (parsed && typeof parsed === 'object' && parsed.fingerprint) {
+            return parsed;
+        }
+    } catch (e) {
+        // If parsing fails, it might be a legacy raw string fingerprint
+        // Return it wrapped in the new object structure
+        return {
+            fingerprint: stored,
+            generatedAt: new Date().toISOString()
+        };
     }
+    return null;
 }
 
 /**
