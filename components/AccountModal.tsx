@@ -174,6 +174,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             تسجيل الخروج
                         </button>
                     </div>
+                    
+                    {/* App Version */}
+                    <div className="mt-6 text-center">
+                        <span className="px-3 py-1 bg-gray-100 rounded-full text-[10px] text-gray-400 font-mono tracking-widest">
+                            v1.4.2
+                        </span>
+                    </div>
                 </div>
 
             </div>

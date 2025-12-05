@@ -14,7 +14,7 @@ export function useOfflineSync() {
 
     // Initial Load & Polling for Pending Count
     useEffect(() => {
-        console.log('🚀 App Version: 1.4.0 - Offline Layer (IndexedDB)'); 
+        console.log('🚀 App Version: 1.4.2 - Offline Layer (IndexedDB)'); 
         registerServiceWorker();
 
         // Function to update count from DB
