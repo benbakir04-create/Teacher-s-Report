@@ -248,7 +248,17 @@ function linkTeacherEmail(registrationId, email, deviceFingerprint) {
   const emailCol = headers.indexOf("البريد الإلكتروني");
   const deviceCol = headers.indexOf("بصمة الجهاز");
   const linkDateCol = headers.indexOf("تاريخ الربط");
-  const emailRequiredCol = headers.indexOf("إلزامية البريد");
+  // Check if email is already used by ANY other teacher (Global Uniqueness)
+  for (let j = 1; j < data.length; j++) {
+      // Skip the current teacher's row if found (we handle their row later)
+      // But actually, we just want to ensure this email isn't used by a DIFFERENT ID
+      if (data[j][emailCol] == email && data[j][idCol] != registrationId) {
+          return {
+              success: false,
+              error: "This email is already registered to another teacher."
+          };
+      }
+  }
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][idCol] == registrationId) {
