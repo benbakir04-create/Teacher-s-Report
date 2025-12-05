@@ -205,8 +205,6 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
     }
   }
 
-  }
-
   return { success: false, error: "Teacher not found" };
 }
 
