@@ -358,34 +358,43 @@ export async function processSyncQueue(): Promise<void> {
         const webAppUrl = import.meta.env.VITE_GOOGLE_WEBAPP_URL;
         if (!webAppUrl) return;
 
-        for (const item of queue) {
-            try {
-                // Determine if we should retry based on backoff strategies if needed
-                // For now, simple retry
-                
-                const response = await fetch(webAppUrl, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(item.payload)
-                });
+        // BATCH PROCESSING
+        // Group all payloads into one request
+        const batchedReports = queue.map(item => item.payload);
 
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success) {
-                        console.log(`✅ Synced item ${item.id}`);
+        try {
+            const response = await fetch(webAppUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'batchAppend',
+                    reports: batchedReports
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    console.log(`✅ Synced batch of ${queue.length} items successfully`);
+                    
+                    // Remove ALL synced items from queue
+                    for (const item of queue) {
                         await dbService.removeSyncItem(item.id);
-                    } else {
-                        console.error(`❌ Sync failed for ${item.id}:`, result.error);
-                        // Optional: Mark as failed or increment retry count
                     }
+                    
+                    // Optional: Show toast success
+                    // toast.success('تمت مزامنة البيانات المحفوظة');
                 } else {
-                     console.error(`❌ Network error for ${item.id}: ${response.statusText}`);
+                    console.error('❌ Batch sync failed:', result.error);
                 }
-            } catch (err) {
-                console.error(`❌ Error syncing item ${item.id}:`, err);
+            } else {
+                console.error(`❌ Network error during batch sync: ${response.statusText}`);
             }
+        } catch (err) {
+            console.error('❌ Error sending batch sync:', err);
         }
+
     } catch (error) {
         console.error('Error processing sync queue:', error);
     }
