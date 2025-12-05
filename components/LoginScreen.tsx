@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LogIn, AlertCircle, Loader } from 'lucide-react';
+import { LogIn, AlertCircle, Loader, Mail } from 'lucide-react';
+import { GoogleVerifyButton } from './GoogleAuth';
 
 interface LoginScreenProps {
     onLogin: (registrationId: string) => Promise<void>;
@@ -9,6 +10,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     const [registrationId, setRegistrationId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showDeviceMismatch, setShowDeviceMismatch] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,14 +22,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
         setLoading(true);
         setError('');
+        setShowDeviceMismatch(false);
 
         try {
             await onLogin(registrationId.trim());
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'حدث خطأ أثناء تسجيل الدخول');
+            const errorMessage = err instanceof Error ? err.message : 'حدث خطأ أثناء تسجيل الدخول';
+            setError(errorMessage);
+            
+            // Check if this is a device mismatch error
+            if (errorMessage.includes('جهاز آخر') || errorMessage.includes('Gmail')) {
+                setShowDeviceMismatch(true);
+            }
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleGoogleSuccess = () => {
+        // Retry login after successful Google verification
+        setShowDeviceMismatch(false);
+        setError('');
+        onLogin(registrationId.trim());
+    };
+
+    const handleGoogleError = (errorMsg: string) => {
+        setError(errorMsg);
     };
 
     return (
@@ -71,6 +91,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                             </div>
                         )}
 
+                        {/* Show Google Sign-In button for device recovery */}
+                        {showDeviceMismatch && registrationId && (
+                            <div className="animate-fade-in">
+                                <GoogleVerifyButton
+                                    registrationId={registrationId.trim()}
+                                    onSuccess={handleGoogleSuccess}
+                                    onError={handleGoogleError}
+                                />
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={loading}
@@ -105,3 +136,4 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
     );
 };
+
