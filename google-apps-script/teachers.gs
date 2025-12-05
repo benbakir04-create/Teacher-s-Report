@@ -205,6 +205,37 @@ function updateDeviceFingerprint(registrationId, deviceFingerprint) {
     }
   }
 
+/**
+ * Reset device fingerprints - Keeps only the provided one (Kill Switch)
+ */
+function resetDeviceFingerprints(registrationId, currentFingerprint) {
+  // Security Check: Must validate that the request comes from a valid device first
+  const security = validateDevice(registrationId, currentFingerprint);
+  if (!security.valid) {
+    return { success: false, error: security.error };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(TEACHERS_SHEET_NAME);
+
+  if (!sheet) {
+    return { success: false, error: "Teachers sheet not found" };
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const idCol = headers.indexOf("رقم التسجيل");
+  const deviceCol = headers.indexOf("بصمة الجهاز");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol] == registrationId) {
+      // Overwrite with ONLY the current fingerprint, removing all others
+      sheet.getRange(i + 1, deviceCol + 1).setValue(currentFingerprint);
+      return { success: true };
+    }
+  }
+
   return { success: false, error: "Teacher not found" };
 }
 
@@ -347,6 +378,12 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(
           updateDeviceFingerprint(data.registrationId, data.deviceFingerprint)
+        )
+      ).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "resetDeviceFingerprints") {
+      return ContentService.createTextOutput(
+        JSON.stringify(
+          resetDeviceFingerprints(data.registrationId, data.deviceFingerprint)
         )
       ).setMimeType(ContentService.MimeType.JSON);
     } else {

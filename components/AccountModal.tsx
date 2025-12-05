@@ -41,6 +41,26 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     // Priority: Google photo > Custom upload > Default icon
     const displayImage = googlePhotoUrl || userImage;
 
+    const handleResetSessions = async () => {
+        if (!teacher) return;
+        
+        if (confirm('هل أنت متأكد؟ سيتم تسجيل الخروج من جميع الأجهزة الأخرى المتصلة بحسابك فوراً.')) {
+            const currentFingerprint = localStorage.getItem('device_fingerprint');
+            if (!currentFingerprint) return;
+
+            // Import dynamically to avoid circular dependencies if any (though here it's fine)
+            const { resetDeviceFingerprints } = await import('../services/teacherService');
+            
+            const success = await resetDeviceFingerprints(teacher.registrationId, currentFingerprint);
+            
+            if (success) {
+                alert('تم تسجيل الخروج من جميع الأجهزة الأخرى بنجاح.');
+            } else {
+                alert('حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.');
+            }
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in">
@@ -103,6 +123,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                     {/* Actions */}
                     <div className="space-y-3">
+                        {/* Security: Reset Sessions */}
+                        {teacher?.email && (
+                             <button
+                                onClick={handleResetSessions}
+                                className="w-full py-3 px-4 bg-purple-50 text-purple-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-100 active:scale-95 transition border border-purple-100"
+                            >
+                                <span className="text-lg">🛡️</span>
+                                إنهاء الجلسات الأخرى
+                            </button>
+                        )}
+
                         <button
                             onClick={onClearCache}
                             className="w-full py-3 px-4 bg-orange-50 text-orange-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-100 active:scale-95 transition border border-orange-100"
@@ -110,10 +141,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             <RefreshCw size={18} />
                             تحديث التطبيق وحل المشاكل
                         </button>
-                        <p className="text-[10px] text-gray-400 text-center px-4">
-                            استخدم هذا الزر إذا واجهت مشاكل في التطبيق أو لضمان الحصول على آخر تحديث
-                        </p>
-
+                        
                         <button
                             onClick={onLogout}
                             className="w-full py-3 px-4 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 active:scale-95 transition border border-red-100"

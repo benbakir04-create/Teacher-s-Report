@@ -177,10 +177,47 @@ export async function updateDeviceFingerprint(
             throw new Error(`Failed to update device: ${response.statusText}`);
         }
 
+    } catch (error) {
+        console.error('Error updating device:', error);
+        return false;
+    }
+}
+
+/**
+ * Reset device fingerprints (Kill Switch)
+ * Keeps only the provided device fingerprint and removes all others
+ */
+export async function resetDeviceFingerprints(
+    registrationId: string,
+    currentFingerprint: string
+): Promise<boolean> {
+    if (!WEBAPP_URL) {
+        console.warn('No Web App URL configured');
+        return false;
+    }
+
+    try {
+        const response = await fetch(WEBAPP_URL, {
+            method: 'POST',
+            mode: 'cors',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify({
+                action: 'resetDeviceFingerprints',
+                registrationId,
+                deviceFingerprint: currentFingerprint
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to reset devices: ${response.statusText}`);
+        }
+
         const data = await response.json();
         return data.success;
     } catch (error) {
-        console.error('Error updating device:', error);
+        console.error('Error resetting devices:', error);
         return false;
     }
 }
