@@ -26,86 +26,119 @@ export interface AuthSession {
 /**
  * Login with registration ID
  */
+// Rate Limiting Logic
+const loginAttempts: Record<string, { count: number; lastAttempt: number }> = {};
+
+/**
+ * Login with registration ID
+ */
 export async function loginWithRegistrationId(registrationId: string): Promise<AuthSession> {
-    // Fetch teacher from Google Sheets
-    let teacher = await fetchTeacherByRegistrationId(registrationId);
+    // Check Rate Limiting
+    const attempts = loginAttempts[registrationId] || { count: 0, lastAttempt: 0 };
+    const now = Date.now();
     
-    // DEMO MODE: If teacher not found and running locally, create demo teacher
-    if (!teacher && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-        console.log('🎭 Demo Mode: Creating demo teacher for development');
-        teacher = {
-            registrationId: registrationId,
-            name: 'معلم تجريبي',
-            school: 'مدرسة الاختبار',
-            level: 'الخامسة ابتدائي',
-            section: 'أ',
-            email: '',
-            deviceFingerprint: '',
-            firstUseDate: new Date().toISOString(),
-            linkDate: '',
-            emailRequired: false
-        };
+    // If 5 failed attempts in last 15 minutes (15 * 60 * 1000 = 900000ms)
+    if (attempts.count >= 5 && (now - attempts.lastAttempt) < 15 * 60 * 1000) {
+        throw new Error('تم تجاوز عدد المحاولات المسموح به (5 مرات). يرجى الانتظار 15 دقيقة قبل المحاولة مرة أخرى.');
     }
-    
-    if (!teacher) {
-        throw new Error('رقم التسجيل غير موجود. يرجى التأكد من الرقم أو التواصل مع الإدارة');
-    }
-    
-    // Get or create device fingerprint
-    const deviceData = getOrCreateFingerprint();
-    const currentFingerprint = deviceData.fingerprint;
-    
-    // Check if teacher has email linked
-    const isLinked = !!teacher.email;
-    
-    // Check device match (Supports Multi-Device)
-    const storedFingerprints = (teacher.deviceFingerprint || '').split(',').map(s => s.trim());
-    const deviceMatches = storedFingerprints.includes(currentFingerprint);
-    
-    // If email linked but device doesn't match, throw error (requires Google Sign-In)
-    if (isLinked && !deviceMatches) {
-        throw new Error('DEVICE_MISMATCH');
-    }
-    
-    // Calculate days since first use
-    let daysSinceFirstUse = 0;
-    if (teacher.firstUseDate) {
-        const firstUse = new Date(teacher.firstUseDate);
-        const now = new Date();
-        daysSinceFirstUse = Math.floor((now.getTime() - firstUse.getTime()) / (1000 * 60 * 60 * 24));
-    }
-    
-    // Update device fingerprint if not set
-    if (!teacher.deviceFingerprint) {
-        teacher.deviceFingerprint = currentFingerprint;
-        // Skip update to Google Sheets in demo mode
-        if (!(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-            await updateDeviceFingerprint(registrationId, currentFingerprint);
+
+    try {
+        // Fetch teacher from Google Sheets
+        let teacher = await fetchTeacherByRegistrationId(registrationId);
+        
+        // DEMO MODE: If teacher not found and running locally, create demo teacher
+        // ... (truncated for brevity, keep existing logic if needed, but here simple fetch is enough as we are inside the function)
+        // Re-adding the demo/fetch logic carefully if I replace the whole block, but I am replacing from line 29
+        
+        // DEMO MODE CHECK (Restoring original logic here to ensure no regression)
+        if (!teacher && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            console.log('🎭 Demo Mode: Creating demo teacher for development');
+            teacher = {
+                registrationId: registrationId,
+                name: 'معلم تجريبي',
+                school: 'مدرسة الاختبار',
+                level: 'الخامسة ابتدائي',
+                section: 'أ',
+                email: '',
+                deviceFingerprint: '',
+                firstUseDate: new Date().toISOString(),
+                linkDate: '',
+                emailRequired: false
+            };
         }
+        
+        if (!teacher) {
+            throw new Error('رقم التسجيل غير موجود. يرجى التأكد من الرقم أو التواصل مع الإدارة');
+        }
+        
+        // Get or create device fingerprint
+        const deviceData = getOrCreateFingerprint();
+        const currentFingerprint = deviceData.fingerprint;
+        
+        // Check if teacher has email linked
+        const isLinked = !!teacher.email;
+        
+        // Check device match (Supports Multi-Device)
+        const storedFingerprints = (teacher.deviceFingerprint || '').split(',').map(s => s.trim());
+        const deviceMatches = storedFingerprints.includes(currentFingerprint);
+        
+        // If email linked but device doesn't match, throw error (requires Google Sign-In)
+        if (isLinked && !deviceMatches) {
+            throw new Error('DEVICE_MISMATCH');
+        }
+        
+        // Calculate days since first use
+        let daysSinceFirstUse = 0;
+        if (teacher.firstUseDate) {
+            const firstUse = new Date(teacher.firstUseDate);
+            daysSinceFirstUse = Math.floor((new Date().getTime() - firstUse.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        
+        // Update device fingerprint if not set
+        if (!teacher.deviceFingerprint) {
+            teacher.deviceFingerprint = currentFingerprint;
+            // Skip update to Google Sheets in demo mode
+            if (!(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                await updateDeviceFingerprint(registrationId, currentFingerprint);
+            }
+        }
+        
+        // Set first use date if not set
+        if (!teacher.firstUseDate) {
+            teacher.firstUseDate = new Date().toISOString();
+        }
+
+        // SUCCESS: Reset attempts and Set Session Start
+        delete loginAttempts[registrationId];
+        localStorage.setItem('session_start_date', new Date().toISOString());
+        
+        // Save to local storage
+        saveTeacherToLocal(teacher);
+        
+        // Determine if needs email link reminder
+        const needsEmailLink = !isLinked && (
+            daysSinceFirstUse === 0 || // First use
+            (teacher.emailRequired && daysSinceFirstUse >= 14) || // Required and past deadline
+            (!teacher.emailRequired && shouldShowDailyReminder()) // Optional daily reminder
+        );
+        
+        return {
+            teacher,
+            deviceFingerprint: currentFingerprint,
+            isLinked,
+            daysSinceFirstUse,
+            needsEmailLink
+        };
+
+    } catch (error) {
+        // Increment failed attempts on error
+        const currentAttempts = loginAttempts[registrationId] || { count: 0, lastAttempt: 0 };
+        loginAttempts[registrationId] = {
+            count: currentAttempts.count + 1,
+            lastAttempt: Date.now()
+        };
+        throw error;
     }
-    
-    // Set first use date if not set
-    if (!teacher.firstUseDate) {
-        teacher.firstUseDate = new Date().toISOString();
-    }
-    
-    // Save to local storage
-    saveTeacherToLocal(teacher);
-    
-    // Determine if needs email link reminder
-    const needsEmailLink = !isLinked && (
-        daysSinceFirstUse === 0 || // First use
-        (teacher.emailRequired && daysSinceFirstUse >= 14) || // Required and past deadline
-        (!teacher.emailRequired && shouldShowDailyReminder()) // Optional daily reminder
-    );
-    
-    return {
-        teacher,
-        deviceFingerprint: currentFingerprint,
-        isLinked,
-        daysSinceFirstUse,
-        needsEmailLink
-    };
 }
 
 /**
@@ -168,6 +201,24 @@ export async function verifyGoogleSignIn(googleUser: any, registrationId: string
 export function getCurrentSession(): AuthSession | null {
     const teacher = getTeacherFromLocal();
     if (!teacher) return null;
+
+    // Check Session Expiration (30 Days)
+    const sessionStart = localStorage.getItem('session_start_date');
+    if (sessionStart) {
+        const startDate = new Date(sessionStart);
+        const now = new Date();
+        const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysActive > 30) {
+            console.warn('Session expired (30 days limit)');
+            logout(); // Auto logout
+            return null;
+        }
+    } else {
+        // If no session start date found (legacy), set it now to avoid immediate logout loop, 
+        // or just accept it as a fresh session start.
+        localStorage.setItem('session_start_date', new Date().toISOString());
+    }
     
     const deviceData = getOrCreateFingerprint();
     const isLinked = !!teacher.email;
@@ -200,7 +251,9 @@ export function logout(): void {
     clearTeacherData();
     // Note: We intentionally keep 'device_fingerprint' in localStorage
     // This allows the user to login again on the same device without Google verification
+    // This allows the user to login again on the same device without Google verification
     localStorage.removeItem('last_reminder_dismiss');
+    localStorage.removeItem('session_start_date');
 }
 
 /**

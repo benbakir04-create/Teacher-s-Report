@@ -18,6 +18,7 @@ export interface TeacherData {
     emailRequired: boolean; // "نعم" = true, "لا" = false
     firstUseDate?: string;
     linkDate?: string;
+    lastLoginDate?: string; // Added locally for session expiry tracking
 }
 
 import { getOrCreateFingerprint } from './deviceService';
@@ -180,6 +181,8 @@ export async function updateDeviceFingerprint(
             throw new Error(`Failed to update device: ${response.statusText}`);
         }
 
+        const data = await response.json();
+        return data.success;
     } catch (error) {
         console.error('Error updating device:', error);
         return false;
