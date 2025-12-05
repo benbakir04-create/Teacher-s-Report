@@ -78,6 +78,9 @@ export async function updateTeacherData(
     }
 
     try {
+        // Get device fingerprint
+        const storedFingerprint = localStorage.getItem('device_fingerprint');
+        
         const response = await fetch(WEBAPP_URL, {
             method: 'POST',
             mode: 'cors',
@@ -87,7 +90,8 @@ export async function updateTeacherData(
             body: JSON.stringify({
                 action: 'updateTeacherData',
                 registrationId,
-                updates
+                updates,
+                deviceFingerprint: storedFingerprint || ''
             })
         });
 

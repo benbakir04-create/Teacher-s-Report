@@ -38,7 +38,7 @@ export async function readSheetRange(range: string): Promise<any[][]> {
  * كتابة البيانات إلى نطاق محدد في الورقة
  * ملاحظة: يتطلب OAuth token، ليس API Key
  */
-export async function appendToSheet(range: string, values: any[][]): Promise<void> {
+export async function appendToSheet(range: string, values: any[][], auth?: { registrationId: string, deviceFingerprint: string }): Promise<void> {
   try {
     // للكتابة، نحتاج OAuth token
     // سنستخدم طريقة بديلة عبر Google Apps Script Web App
@@ -59,7 +59,8 @@ export async function appendToSheet(range: string, values: any[][]): Promise<voi
       body: JSON.stringify({
         action: 'appendToSheet',
         range,
-        values
+        values,
+        auth // Send auth data if provided
       })
     };
     console.log('Sending request with options:', fetchOptions);
@@ -309,7 +310,13 @@ export async function saveReport(report: any): Promise<void> {
       report.notes || ''
     ];
     
-    await appendToSheet('التقارير!A:V', [row]);
+    // Get device fingerprint for security
+    const deviceFingerprint = localStorage.getItem('device_fingerprint') || '';
+    
+    await appendToSheet('التقارير!A:V', [row], {
+      registrationId: report.general.id,
+      deviceFingerprint
+    });
   } catch (error) {
     console.error('Error saving report:', error);
     throw error;
