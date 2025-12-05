@@ -7,6 +7,27 @@
 const TEACHERS_SHEET_NAME = "المعلمون";
 
 /**
+ * Log error to the Errors sheet
+ */
+function logError(context, errorMessage) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("الأخطاء");
+
+    if (!sheet) {
+      sheet = ss.insertSheet("الأخطاء");
+      sheet
+        .getRange(1, 1, 1, 3)
+        .setValues([["الطابع الزمني", "السياق", "الخطأ"]]);
+    }
+
+    sheet.appendRow([new Date().toISOString(), context, errorMessage]);
+  } catch (e) {
+    console.error("Failed to log error:", e);
+  }
+}
+
+/**
  * Get teacher by registration ID
  */
 function getTeacherByRegistrationId(registrationId) {
