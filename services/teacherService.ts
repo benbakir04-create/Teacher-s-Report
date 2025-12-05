@@ -193,10 +193,12 @@ export async function resetDeviceFingerprints(
 ): Promise<{ success: boolean; error?: string }> {
     if (!WEBAPP_URL) {
         console.warn('No Web App URL configured');
-        return { success: false, error: 'Configuration Error' };
+        return { success: false, error: 'خطأ في تهيئة التطبيق' };
     }
 
     try {
+        console.log('🔄 Calling resetDeviceFingerprints with:', { registrationId, currentFingerprint: currentFingerprint?.substring(0, 8) + '...' });
+        
         const response = await fetch(WEBAPP_URL, {
             method: 'POST',
             mode: 'cors',
@@ -210,19 +212,28 @@ export async function resetDeviceFingerprints(
             })
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+
         if (!response.ok) {
-            throw new Error(`Failed to reset devices: ${response.statusText}`);
+            return { success: false, error: `خطأ في الشبكة: ${response.status}` };
         }
 
         const data = await response.json();
-        // Server might return 'error' or 'message' in case of failure
-        if (!data.success && !data.error && data.message) {
-            data.error = data.message;
+        console.log('📦 Full server response:', JSON.stringify(data));
+        
+        // Normalize error field
+        if (!data.success) {
+            const errorMessage = data.error || data.message || 'خطأ غير معروف من السيرفر';
+            return { success: false, error: errorMessage };
         }
-        return data; // Returns { success: true/false, error: ... }
+
+        return { success: true };
     } catch (error) {
-        console.error('Error resetting devices:', error);
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        console.error('❌ Error in resetDeviceFingerprints:', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'فشل الاتصال بالسيرفر' 
+        };
     }
 }
 
