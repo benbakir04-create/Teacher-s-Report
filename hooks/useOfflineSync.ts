@@ -3,7 +3,8 @@ import {
     isOnline, 
     setupConnectionListeners, 
     registerServiceWorker,
-    clearAppCache as clearCacheService
+    clearAppCache as clearCacheService,
+    updateAppVersion
 } from '../services/offlineService';
 import { dbService } from '../services/db.service';
 import { processSyncQueue } from '../services/googleSheetsService';
@@ -11,11 +12,12 @@ import { processSyncQueue } from '../services/googleSheetsService';
 export function useOfflineSync() {
     const [online, setOnline] = useState(isOnline());
     const [pendingCount, setPendingCount] = useState(0);
+    const [updateAvailable, setUpdateAvailable] = useState(false);
 
     // Initial Load & Polling for Pending Count
     useEffect(() => {
         console.log('🚀 App Version: 1.4.3 - Offline Layer (IndexedDB)'); 
-        registerServiceWorker();
+        registerServiceWorker(() => setUpdateAvailable(true));
 
         // Function to update count from DB
         const updateCount = async () => {
@@ -59,10 +61,16 @@ export function useOfflineSync() {
         }
     };
 
+    const handleUpdateApp = () => {
+        updateAppVersion();
+    };
+
     return {
         online,
         pendingCount,
         setPendingCount,
-        handleClearCache
+        handleClearCache,
+        updateAvailable,
+        handleUpdateApp
     };
 }

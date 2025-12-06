@@ -68,7 +68,10 @@ export default function App() {
         online, 
         pendingCount, 
         setPendingCount, 
-        handleClearCache 
+        setPendingCount, 
+        handleClearCache,
+        updateAvailable,
+        handleUpdateApp
     } = useOfflineSync();
 
     // 4. App Data Hook
@@ -459,6 +462,17 @@ export default function App() {
                             {pendingCount} تقارير معلقة
                         </span>
                     )}
+                </div>
+            )}
+            
+            {/* New Version Update Banner */}
+            {updateAvailable && (
+                <div 
+                    onClick={handleUpdateApp}
+                    className="fixed top-0 left-0 right-0 bg-indigo-600 text-white text-center py-3 z-[60] flex items-center justify-center gap-2 shadow-xl cursor-pointer hover:bg-indigo-700 transition animate-bounce-in"
+                >
+                    <RefreshCw size={20} className="animate-spin-slow" />
+                    <span className="font-bold text-sm">تحديث جديد متوفر! اضغط هنا للتحديث فوراً 🚀</span>
                 </div>
             )}
 

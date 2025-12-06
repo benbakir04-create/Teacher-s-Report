@@ -146,24 +146,27 @@ export function setupConnectionListeners(
 /**
  * تثبيت Service Worker
  */
-export function registerServiceWorker(): void {
+export function registerServiceWorker(onUpdateAvailable?: () => void): void {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
           console.log('ServiceWorker registered:', registration.scope);
           
+          // Check for waiting worker (if sw was updated but waiting)
+          if (registration.waiting) {
+              if (onUpdateAvailable) onUpdateAvailable();
+          }
+
           // Check for updates
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content is available; please refresh.
-                  console.log('New version available. Refreshing...');
-                  if (confirm('تحديث جديد متوفر! هل تريد تحديث التطبيق الآن؟')) {
-                    window.location.reload();
-                  }
+                    // New content is available; please refresh.
+                    console.log('New version available (installed).');
+                    if (onUpdateAvailable) onUpdateAvailable();
                 }
               });
             }
@@ -183,6 +186,18 @@ export function registerServiceWorker(): void {
       });
     });
   }
+}
+
+export function updateAppVersion() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg && reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else {
+                window.location.reload();
+            }
+        });
+    }
 }
 
 /**
