@@ -441,6 +441,96 @@ function doPost(e) {
       );
     }
 
+    }
+
+    // --- جلب تقارير المعلم (للمزامنة العكسية) ---
+    else if (action === "getReports") {
+        if (!registrationId || !deviceFingerprint) {
+             return output.setContent(JSON.stringify({ success: false, error: "Missing Auth" }));
+        }
+        
+        const security = validateDevice(registrationId, deviceFingerprint);
+        if (!security.valid) {
+             return output.setContent(JSON.stringify({ success: false, error: security.error }));
+        }
+
+        const sheetName = "التقارير";
+        const sheet = ss.getSheetByName(sheetName);
+        if (!sheet) {
+             return output.setContent(JSON.stringify({ success: true, reports: [] }));
+        }
+
+        const data = sheet.getDataRange().getValues();
+        if (data.length <= 1) { // Only headers
+             return output.setContent(JSON.stringify({ success: true, reports: [] }));
+        }
+
+        // Header mapping (Assuming standard order or dynamic lookup)
+        const headers = data[0];
+        const idCol = headers.indexOf("رقم التسجيل"); // Ensure this matches exactly "رقم التسجيل"
+
+        if (idCol === -1) {
+            return output.setContent(JSON.stringify({ success: false, error: "Invalid sheet structure" }));
+        }
+
+        // Filter reports for this teacher
+        // We map rows back to Report Data structure
+        const myReports = [];
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            if (row[idCol] == registrationId) {
+                // Construct Report Object (Reversing saveReport logic)
+                try {
+                    // Safe access helper
+                    const get = (idx) => (row[idx] != null ? String(row[idx]) : "");
+                    
+                    // Simple reconstruction - Client might need to type cast properly
+                    // Indices based on saveReport: 
+                    // 0:Time, 1:ID, 2:Name, 3:School, 4:Level, 5:Section, 6:Date, 7:Quran, 
+                    // 8:Sub1, 9:Gen1, 10:Less1, 11:Strat1, 12:Tools1, 13:Task1, 
+                    // 14:Has2, 15:Sub2, 16:Gen2, 17:Less2, 18:Strat2, 19:Tools2, 20:Task2, 21:Notes
+                    
+                    const report = {
+                        uid: get(0) + "-" + get(1), // Fake UID using Timestamp+ID if not stored
+                        general: {
+                            id: get(1),
+                            name: get(2),
+                            school: get(3),
+                            level: get(4),
+                            sectionId: get(5),
+                            date: get(6).split("T")[0] // Ensure date format
+                        },
+                        quranReport: get(7),
+                        firstClass: {
+                            subject: get(8),
+                            gender: get(9),
+                            lesson: get(10),
+                            strategies: get(11) ? get(11).split("، ") : [],
+                            tools: get(12) ? get(12).split("، ") : [],
+                            tasks: get(13) ? get(13).split("، ") : []
+                        },
+                        hasSecondClass: get(14) === 'نعم',
+                        secondClass: {
+                            subject: get(15),
+                            gender: get(16),
+                            lesson: get(17),
+                            strategies: get(18) ? get(18).split("، ") : [],
+                            tools: get(19) ? get(19).split("، ") : [],
+                            tasks: get(20) ? get(20).split("، ") : []
+                        },
+                        notes: get(21),
+                        savedAt: new Date(get(0)).getTime()
+                    };
+                    myReports.push(report);
+                } catch (err) {
+                    console.error("Error parsing row " + i, err);
+                }
+            }
+        }
+        
+        return output.setContent(JSON.stringify({ success: true, reports: myReports }));
+    }
+
     // --- معالجة بيانات المعلمين ---
     else if (action === "getTeacherByRegistrationId") {
       return ContentService.createTextOutput(

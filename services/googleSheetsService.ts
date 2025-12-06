@@ -484,3 +484,43 @@ function getDefaultConfig() {
     ]
   };
 }
+
+/**
+ * جلب التقارير الخاصة بالمعلم من السيرفر (مزامنة عكسية)
+ */
+export async function fetchUserReports(registrationId: string): Promise<any[]> {
+    try {
+        const webAppUrl = import.meta.env.VITE_GOOGLE_WEBAPP_URL;
+        const deviceFingerprint = localStorage.getItem('device_fingerprint') || '';
+        
+        if (!webAppUrl) {
+           console.warn('Web App URL not configured');
+           return [];
+        }
+
+        const response = await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'getReports',
+                registrationId: registrationId,
+                deviceFingerprint: deviceFingerprint
+            })
+        });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const result = await response.json();
+        if (result.success) {
+            return result.reports;
+        } else {
+            console.error('Server error fetching reports:', result.error);
+            // Don't throw if just no reports found, but if error is real, log it
+            return [];
+        }
+    } catch (error) {
+        console.error('Error fetching user reports:', error);
+        throw error;
+    }
+}

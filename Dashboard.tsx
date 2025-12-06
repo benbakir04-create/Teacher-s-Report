@@ -18,8 +18,36 @@ export function Dashboard({ stats }: DashboardProps) {
   const totalOverdue = 0; // TODO: Implement real overdue calculation in StatisticsEngine 
 
   async function syncReportsFromSheets() {
-      // ... (Sync logic can remain or be moved to a hook later)
-      alert('سيتم تفعيل المزامنة قريباً بشكل كامل');
+    try {
+        setSyncing(true);
+        // Import dynamically to avoid circular issues or large bundles if not used
+        const { fetchUserReports } = await import('./services/googleSheetsService');
+        const { dbService } = await import('./services/db.service');
+        const { getCurrentSession } = await import('./services/authService'); // Assuming this helper exists or we get ID from prop
+
+        // We need the registration ID. Since it's not passed as prop, we try to get it from localStorage or authService
+        const session = getCurrentSession(); 
+        if (!session?.teacher?.registrationId) {
+            alert('يجب تسجيل الدخول للمزامنة');
+            return;
+        }
+
+        const reports = await fetchUserReports(session.teacher.registrationId);
+        
+        if (reports.length > 0) {
+            await dbService.bulkUpsertReports(reports);
+            alert(`تم استرجاع ${reports.length} تقرير بنجاح! سيتم تحديث الصفحة.`);
+            window.location.reload(); // Simple way to refresh all stats listeners
+        } else {
+            alert('لم يتم العثور على تقارير في السيرفر لهذا الحساب.');
+        }
+
+    } catch (error) {
+        console.error('Sync error:', error);
+        alert('حدث خطأ أثناء المزامنة. تأكد من الاتصال بالإنترنت.');
+    } finally {
+        setSyncing(false);
+    }
   }
 
   if (!stats || stats.length === 0) {

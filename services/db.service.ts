@@ -139,6 +139,26 @@ class DBService {
         await this.add(STORES.REPORTS, storedReport);
     }
 
+    async bulkUpsertReports(reports: any[]): Promise<void> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.REPORTS], 'readwrite');
+            const store = transaction.objectStore(STORES.REPORTS);
+            
+            reports.forEach(report => {
+                const storedReport: StoredReport = {
+                    id: report.uid || (report.savedAt + '-' + Math.random().toString(36).substr(2, 5)),
+                    data: report,
+                    createdAt: report.savedAt || Date.now()
+                };
+                store.put(storedReport);
+            });
+
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
     async getAllReports(): Promise<any[]> {
         const stored = await this.getAll<StoredReport>(STORES.REPORTS);
         return stored.map(item => item.data);
