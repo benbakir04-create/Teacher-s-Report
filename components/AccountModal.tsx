@@ -178,7 +178,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     {/* App Version */}
                     <div className="mt-6 text-center">
                         <span className="px-3 py-1 bg-gray-100 rounded-full text-[10px] text-gray-400 font-mono tracking-widest">
-                            v1.4.2
+                            v1.4.3
                         </span>
                     </div>
                 </div>
