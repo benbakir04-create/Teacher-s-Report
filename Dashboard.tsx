@@ -14,8 +14,8 @@ export function Dashboard({ stats }: DashboardProps) {
   const completedLessons = stats.reduce((acc, curr) => acc + curr.actual, 0);
   const overallPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
   
-  // Mock overdue calculation (since ChartData doesn't have it directly, we can infer or mock for now)
-  const totalOverdue = Math.floor(Math.random() * 5); 
+  // Mock overdue calculation
+  const totalOverdue = 0; // TODO: Implement real overdue calculation in StatisticsEngine 
 
   async function syncReportsFromSheets() {
       // ... (Sync logic can remain or be moved to a hook later)
