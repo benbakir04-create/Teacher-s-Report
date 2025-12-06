@@ -64,6 +64,7 @@ export default function App() {
     } = useReportForm();
 
     // 3. Offline Sync Hook
+    const { 
         online, 
         pendingCount, 
         setPendingCount, 
