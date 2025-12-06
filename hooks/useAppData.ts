@@ -28,21 +28,19 @@ export function useAppData(report: ReportData, handleClassChange: (classType: 'f
             const subjects = appData.subjects[report.general.level] || [];
             setAvailableSubjects(subjects);
             
-            // Fixed curriculum list for the chart as requested
-            const reportSubjects = ["القرآن", "التربية الإيمانية", "الفقه", "اللغة العربية", "أحكام التجويد", "التاريخ"];
-            
-            // Generate Mock Stats with fixed values for visualization if no real data
-            const mockStats = reportSubjects.map(subj => {
-                const total = Math.floor(Math.random() * 10) + 15; // 15-25
-                const actual = Math.floor(Math.random() * total); // 0 to total
-                return {
-                    subject: subj,
-                    total: total,
-                    actual: actual,
-                    percentage: Math.round((actual/total) * 100) + '%'
-                };
+            // Load Live Stats from Engine
+            import('../services/statistics.engine').then(({ statsEngine }) => {
+                statsEngine.calculateLiveStats().then(liveStats => {
+                    console.log('📊 Live Stats Calculated:', liveStats);
+                    if (liveStats.subjectDistribution.length > 0) {
+                        setStatsData(liveStats.subjectDistribution);
+                    } else {
+                        // Fallback to empty structure if no reports yet, or keep partial mocks?
+                        // Let's keep empty array to show "No Data" state or initial state
+                         setStatsData([]);
+                    }
+                });
             });
-            setStatsData(mockStats);
 
             // Reset subject selections if they are no longer valid
             const validSubjects = appData.subjects[report.general.level] || [];
@@ -58,7 +56,11 @@ export function useAppData(report: ReportData, handleClassChange: (classType: 'f
             setAvailableSubjects([]);
             setStatsData([]);
         }
-    }, [report.general.level, appData]);
+    }, [report.general.level, appData, report.general.date]); // Added date dependency to trigger on report save/change implicitly? 
+    // Ideally we want to trigger on "Report Saved". 
+    // Since useAppData depends on 'report', it might re-run often. 
+    // We should optimize this, perhaps move stats to a separate hook or context.
+    // For now, this fits fully within "React + Hooks" paradigm.
 
     return {
         appData,

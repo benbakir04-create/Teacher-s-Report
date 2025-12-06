@@ -139,6 +139,11 @@ class DBService {
         await this.add(STORES.REPORTS, storedReport);
     }
 
+    async getAllReports(): Promise<any[]> {
+        const stored = await this.getAll<StoredReport>(STORES.REPORTS);
+        return stored.map(item => item.data);
+    }
+
     async addToSyncQueue(payload: any): Promise<void> {
         const syncItem: SyncItem = {
             id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),

@@ -67,3 +67,10 @@ export interface TeacherStats {
   subjectProgress: SubjectProgress[];
   totalOverdue: number;
 }
+
+export interface ChartData {
+    subject: string;
+    total: number;
+    actual: number;
+    percentage: string;
+}
