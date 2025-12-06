@@ -18,6 +18,7 @@ import { useAuth } from './hooks/useAuth';
 import { useReportForm } from './hooks/useReportForm';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { useAppData } from './hooks/useAppData';
+import { getLessonsForSubject } from './dataManager';
 
 // Helper to format date as YYYY/MM/DD
 const formatDateDisplay = (dateString: string): string => {
@@ -327,7 +328,7 @@ export default function App() {
                                 onClick={() => setReport(prev => ({ ...prev, hasSecondClass: false }))}
                                 className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-300 
                                     ${!report.hasSecondClass 
-                                        ? 'bg-secondary text-white shadow-md transform scale-105' 
+                                        ? 'bg-primary text-white shadow-md transform scale-105' 
                                         : 'text-gray-400 hover:bg-gray-200'
                                     }`}
                             >
@@ -361,13 +362,19 @@ export default function App() {
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 mb-1">عنوان الدرس</label>
-                                <input
-                                    type="text"
-                                    value={data.lesson}
-                                    onChange={(e) => handleClassChange(classType, 'lesson', e.target.value)}
-                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 focus:border-primary outline-none"
-                                    placeholder="اكتب العنوان..."
-                                />
+                                <div className="relative">
+                                    <select
+                                        value={data.lesson}
+                                        onChange={(e) => handleClassChange(classType, 'lesson', e.target.value)}
+                                        className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
+                                    >
+                                        <option value="">اختر الدرس...</option>
+                                        {getLessonsForSubject(data.subject, report.general.level, data.gender).map(lesson => (
+                                            <option key={lesson} value={lesson}>{lesson}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
                         </div>
 

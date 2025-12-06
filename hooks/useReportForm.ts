@@ -182,7 +182,7 @@ export function useReportForm() {
             if (online) {
                 await saveReport(report);
                 await saveBackup(report);
-                toast.success("✅ تم حفظ التقرير بنجاح!");
+                toast.success("تم حفظ التقرير بنجاح!");
                 setPendingCount(0);
             } else {
                 savePendingReport(report);

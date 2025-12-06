@@ -441,7 +441,72 @@ function doPost(e) {
       );
     }
 
-    // --- جلب تقارير المعلم (للمزامنة العكسية) ---
+    // --- معالجة إضافة البيانات دفعة واحدة (Batch Append) ---
+    else if (action === "batchAppend") {
+      const reports = data.reports;
+      if (!reports || !Array.isArray(reports) || reports.length === 0) {
+        return output.setContent(
+          JSON.stringify({ success: false, error: "No reports provided" })
+        );
+      }
+
+      // Validate auth from first report
+      const firstAuth = reports[0].auth;
+      if (!firstAuth || !firstAuth.registrationId || !firstAuth.deviceFingerprint) {
+        return output.setContent(
+          JSON.stringify({ success: false, error: "Missing auth in batch" })
+        );
+      }
+
+      const security = validateDevice(firstAuth.registrationId, firstAuth.deviceFingerprint);
+      if (!security.valid) {
+        return output.setContent(
+          JSON.stringify({ success: false, error: security.error })
+        );
+      }
+
+      // Get or create reports sheet
+      const sheetName = "التقارير";
+      let sheet = ss.getSheetByName(sheetName);
+      if (!sheet) {
+        sheet = ss.insertSheet(sheetName);
+        const headers = [
+          "الطابع الزمني", "رقم التسجيل", "الاسم", "المدرسة", "المستوى",
+          "القسم", "التاريخ", "تقرير القرآن",
+          "مادة الحصة 1", "جنس 1", "درس الحصة 1", "استراتيجيات 1", "وسائل 1", "مهام 1",
+          "يوجد حصة ثانية", "مادة الحصة 2", "جنس 2", "درس الحصة 2", "استراتيجيات 2", "وسائل 2", "مهام 2",
+          "ملاحظات"
+        ];
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      }
+
+      // Extract all rows from batch
+      const allRows = [];
+      reports.forEach((reportPayload) => {
+        if (reportPayload.values && Array.isArray(reportPayload.values)) {
+          reportPayload.values.forEach((row) => {
+            allRows.push(row);
+          });
+        }
+      });
+
+      if (allRows.length === 0) {
+        return output.setContent(
+          JSON.stringify({ success: false, error: "No rows to insert" })
+        );
+      }
+
+      // Bulk insert using setValues (much faster than appendRow)
+      const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, allRows.length, allRows[0].length).setValues(allRows);
+
+      return output.setContent(
+        JSON.stringify({
+          success: true,
+          message: `Batch added ${allRows.length} rows successfully`,
+        })
+      );
+    }
     else if (action === "getReports") {
       if (!registrationId || !deviceFingerprint) {
         return output.setContent(
