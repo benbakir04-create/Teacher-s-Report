@@ -17,7 +17,6 @@ interface DailyReportPageProps {
     setReport: React.Dispatch<React.SetStateAction<ReportData>>;
     appData: ListData;
     availableSubjects: string[];
-    archive: ArchivedReport[];
     loadFromHistory: (uid: string) => void;
     saveToArchive: (online: boolean, setPendingCount: React.Dispatch<React.SetStateAction<number>>) => Promise<void>;
     online: boolean;
@@ -42,7 +41,7 @@ const formatDateDisplay = (dateString: string): string => {
 };
 
 export function DailyReportPage({
-    report, setReport, appData, availableSubjects, archive,
+    report, setReport, appData, availableSubjects,
     loadFromHistory, saveToArchive, online, setPendingCount,
     dateInputType, setDateInputType, handleGeneralChange, handleClassChange,
     activeSubTab, setActiveSubTab
@@ -84,7 +83,6 @@ export function DailyReportPage({
     const renderGeneralInfo = () => {
         const { id, name, school, level, sectionId, date } = report.general;
         const isGeneralComplete = !!(id && name && school && level && sectionId && date);
-        const sortedArchive = [...archive].sort((a, b) => b.savedAt - a.savedAt);
 
         return (
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 animate-fade-in">
@@ -162,24 +160,9 @@ export function DailyReportPage({
                         </div>
                     </div>
 
-                    {/* Date Section with History Loader */}
+                    {/* Date Section */}
                     <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mt-2">
-                        <div className="mb-3 relative">
-                            <select
-                                onChange={(e) => loadFromHistory(e.target.value)}
-                                className="w-full p-2 pl-8 text-xs bg-white text-primary font-bold rounded-lg border border-primary/30 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900"
-                                value=""
-                            >
-                                <option value="" disabled>📂 استرجاع تقرير سابق...</option>
-                                {sortedArchive.map(item => (
-                                    <option key={item.uid} value={item.uid}>
-                                        {formatDateDisplay(item.general.date)} - {item.general.sectionId}
-                                    </option>
-                                ))}
-                            </select>
-                            <RefreshCw size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
-                        </div>
-
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1">تاريخ التقرير</label>
                         <div className="relative">
                             <input
                                 type={dateInputType}
@@ -418,6 +401,10 @@ export function DailyReportPage({
             <ReportDetailsModal
                 isOpen={isDetailsModalOpen}
                 onClose={() => setIsDetailsModalOpen(false)}
+                onEdit={(uid) => {
+                    loadFromHistory(uid);
+                    setActiveSubTab('form');
+                }}
                 report={detailsReport}
             />
         </div>

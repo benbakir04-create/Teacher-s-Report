@@ -31,6 +31,15 @@ export interface ArchivedReport extends ReportData {
     savedAt: number;
 }
 
+// New Draft Interface
+export interface Draft {
+    id: string; // Composite key: classId + date (or just unique uuid)
+    classId: string; // sectionId
+    date: string;
+    data: ReportData;
+    updatedAt: number;
+}
+
 export interface ListData {
     schools: string[];
     levels: string[];

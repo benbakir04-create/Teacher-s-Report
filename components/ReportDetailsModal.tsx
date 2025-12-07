@@ -5,6 +5,7 @@ import { ReportData } from '../types';
 interface ReportDetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onEdit: (uid: string) => void;
     report: ReportData | null;
 }
 
@@ -19,7 +20,7 @@ const formatDate = (dateString: string): string => {
     return `${year}/${month}/${day}`;
 };
 
-export function ReportDetailsModal({ isOpen, onClose, report }: ReportDetailsModalProps) {
+export function ReportDetailsModal({ isOpen, onClose, onEdit, report }: ReportDetailsModalProps) {
     if (!isOpen || !report) return null;
 
     const renderSection = (title: string, icon: React.ReactNode, content: React.ReactNode) => (
@@ -175,13 +176,41 @@ export function ReportDetailsModal({ isOpen, onClose, report }: ReportDetailsMod
                     )}
                 </div>
 
+interface ReportDetailsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onEdit: (uid: string) => void;
+    report: ReportData | null;
+}
+
+// ... existing code ...
+
+export function ReportDetailsModal({ isOpen, onClose, onEdit, report }: ReportDetailsModalProps) {
+    if (!isOpen || !report) return null;
+
+// ... existing render code ...
+
                 {/* Footer */}
-                <div className="p-4 border-t bg-gray-50">
+                <div className="p-4 border-t bg-gray-50 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition"
+                        className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition"
                     >
                         إغلاق
+                    </button>
+                    <button
+                        onClick={() => {
+                            // If report has uid (from DB) use it, else fallback (though DB reports always have ID)
+                            const uid = (report as any).uid || (report as any).id; 
+                            if (uid) {
+                                onEdit(uid);
+                                onClose();
+                            }
+                        }}
+                        className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition flex items-center justify-center gap-2"
+                    >
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        تعديل التقرير
                     </button>
                 </div>
             </div>

@@ -9,7 +9,19 @@ export interface SyncItem {
 export interface StoredReport {
     id: string;
     data: any;
+    classId?: string; // Indexable
+    date?: string;    // Indexable
     createdAt: number;
+    updatedAt?: number;
+    status: 'submitted';
+}
+
+export interface StoredDraft {
+    id: string; // Unique ID
+    classId: string; // For querying by class
+    date: string;    // For querying by date
+    data: any;
+    updatedAt: number;
 }
 
 // General Data for teacher profile
@@ -25,9 +37,10 @@ export interface GeneralData {
 }
 
 const DB_NAME = 'teacher-report-db';
-const DB_VERSION = 2; // Incremented for config store
+const DB_VERSION = 3; // Upgraded to 3 for Drafts
 const STORES = {
     REPORTS: 'reports',
+    DRAFTS: 'drafts', // New Store
     SYNC_QUEUE: 'syncQueue',
     SETTINGS: 'settings',
     CONFIG: 'config'
@@ -37,12 +50,8 @@ class DBService {
     private db: IDBDatabase | null = null;
     private initPromise: Promise<void> | null = null;
 
-    // Removed constructor call - initialization is now lazy
-
     async init(): Promise<void> {
-        // Only run in browser environment
         if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
-            console.warn('IndexedDB not available (non-browser environment)');
             return Promise.resolve();
         }
         
@@ -58,29 +67,51 @@ class DBService {
 
             request.onsuccess = (event) => {
                 this.db = (event.target as IDBOpenDBRequest).result;
-                console.log('✅ IndexedDB initialized');
+                console.log('✅ IndexedDB initialized (v3)');
                 resolve();
             };
 
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                // Reports Store
+                // 1. Reports Store
                 if (!db.objectStoreNames.contains(STORES.REPORTS)) {
-                    db.createObjectStore(STORES.REPORTS, { keyPath: 'id' });
+                    const reportStore = db.createObjectStore(STORES.REPORTS, { keyPath: 'id' });
+                    // Add indexes for efficient querying
+                    reportStore.createIndex('classId', 'classId', { unique: false });
+                    reportStore.createIndex('date', 'date', { unique: false });
+                } else {
+                    // If migrating from v2, add indexes if missing
+                    const reportStore = (event.target as IDBOpenDBRequest).transaction!.objectStore(STORES.REPORTS);
+                    if (!reportStore.indexNames.contains('classId')) {
+                         // We might need to migrate data structure here if existing data doesn't have classId at top level
+                         // For now simply creating index. Logic application will handle filling it.
+                         reportStore.createIndex('classId', 'data.general.sectionId', { unique: false }); 
+                    }
+                    if (!reportStore.indexNames.contains('date')) {
+                        reportStore.createIndex('date', 'data.general.date', { unique: false });
+                    }
                 }
 
-                // Sync Queue Store
+                // 2. Drafts Store (New)
+                if (!db.objectStoreNames.contains(STORES.DRAFTS)) {
+                    const draftStore = db.createObjectStore(STORES.DRAFTS, { keyPath: 'id' });
+                    draftStore.createIndex('classId', 'classId', { unique: false });
+                    draftStore.createIndex('date', 'date', { unique: false });
+                    draftStore.createIndex('lookupKey', ['classId', 'date'], { unique: false }); // Composite helper
+                }
+
+                // 3. Sync Queue
                 if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
                     db.createObjectStore(STORES.SYNC_QUEUE, { keyPath: 'id' });
                 }
 
-                // Settings Store
+                // 4. Settings
                 if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
                     db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
                 }
 
-                // Config Store (for GeneralData)
+                // 5. Config
                 if (!db.objectStoreNames.contains(STORES.CONFIG)) {
                     db.createObjectStore(STORES.CONFIG, { keyPath: 'key' });
                 }
@@ -104,7 +135,6 @@ class DBService {
             const transaction = db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             const request = store.put(item);
-
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
@@ -116,7 +146,6 @@ class DBService {
             const transaction = db.transaction([storeName], 'readonly');
             const store = transaction.objectStore(storeName);
             const request = store.getAll();
-
             request.onsuccess = () => resolve(request.result as T[]);
             request.onerror = () => reject(request.error);
         });
@@ -128,59 +157,80 @@ class DBService {
             const transaction = db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             const request = store.delete(id);
-
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
     }
 
-    async count(storeName: string): Promise<number> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.count();
-
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    // --- Specific Helpers ---
+    // --- REPORTS APIs ---
 
     async saveReport(report: any): Promise<void> {
+        const id = report.uid || Date.now().toString();
         const storedReport: StoredReport = {
-            id: report.uid || Date.now().toString(),
+            id: id,
             data: report,
-            createdAt: Date.now()
+            classId: report.general?.sectionId,
+            date: report.general?.date,
+            createdAt: report.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            status: 'submitted'
         };
         await this.add(STORES.REPORTS, storedReport);
     }
 
-    async bulkUpsertReports(reports: any[]): Promise<void> {
-        const db = await this.getDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.REPORTS], 'readwrite');
-            const store = transaction.objectStore(STORES.REPORTS);
-            
-            reports.forEach(report => {
-                const storedReport: StoredReport = {
-                    id: report.uid || (report.savedAt + '-' + Math.random().toString(36).substr(2, 5)),
-                    data: report,
-                    createdAt: report.savedAt || Date.now()
-                };
-                store.put(storedReport);
-            });
-
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
-        });
+    async getReportById(id: string): Promise<any | null> {
+         const db = await this.getDB();
+         return new Promise((resolve, reject) => {
+             const transaction = db.transaction([STORES.REPORTS], 'readonly');
+             const store = transaction.objectStore(STORES.REPORTS);
+             const request = store.get(id);
+             request.onsuccess = () => resolve(request.result?.data || null);
+             request.onerror = () => reject(request.error);
+         });
     }
 
     async getAllReports(): Promise<any[]> {
         const stored = await this.getAll<StoredReport>(STORES.REPORTS);
         return stored.map(item => item.data);
     }
+
+    // --- DRAFTS APIs ---
+
+    async saveDraft(draftData: any): Promise<void> {
+        if (!draftData.general?.sectionId || !draftData.general?.date) return;
+        
+        // Ensure ID is stable for same day/class to overwrite properly
+        const draftId = `${draftData.general.sectionId}_${draftData.general.date}`; 
+        
+        const draft: StoredDraft = {
+            id: draftId,
+            classId: draftData.general.sectionId,
+            date: draftData.general.date,
+            data: draftData,
+            updatedAt: Date.now()
+        };
+        
+        await this.add(STORES.DRAFTS, draft);
+    }
+
+    async getDraft(classId: string, date: string): Promise<any | null> {
+        const db = await this.getDB();
+        const draftId = `${classId}_${date}`;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.DRAFTS], 'readonly');
+            const store = transaction.objectStore(STORES.DRAFTS);
+            const request = store.get(draftId);
+            request.onsuccess = () => resolve(request.result?.data || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteDraft(classId: string, date: string): Promise<void> {
+        const draftId = `${classId}_${date}`;
+        await this.delete(STORES.DRAFTS, draftId);
+    }
+
+    // --- SYNC & CONFIG ---
 
     async addToSyncQueue(payload: any): Promise<void> {
         const syncItem: SyncItem = {
@@ -202,10 +252,15 @@ class DBService {
     }
 
     async getPendingCount(): Promise<number> {
-        return this.count(STORES.SYNC_QUEUE);
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.SYNC_QUEUE], 'readonly');
+            const store = transaction.objectStore(STORES.SYNC_QUEUE);
+            const request = store.count();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
     }
-
-    // --- General Data (Config) ---
 
     async saveGeneralData(data: GeneralData): Promise<void> {
         await this.add(STORES.CONFIG, {
@@ -221,15 +276,9 @@ class DBService {
             const transaction = db.transaction([STORES.CONFIG], 'readonly');
             const store = transaction.objectStore(STORES.CONFIG);
             const request = store.get('generalData');
-
             request.onsuccess = () => {
                 const result = request.result;
-                if (result) {
-                    const { key, ...data } = result;
-                    resolve(data as GeneralData);
-                } else {
-                    resolve(null);
-                }
+                resolve(result ? (({ key, ...data }) => data)(result) as GeneralData : null);
             };
             request.onerror = () => reject(request.error);
         });

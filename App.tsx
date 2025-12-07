@@ -47,7 +47,6 @@ export default function App() {
         setReport, 
         activeTab, 
         setActiveTab, 
-        archive, 
         dateInputType, 
         setDateInputType, 
         handleGeneralChange, 
@@ -253,7 +252,6 @@ export default function App() {
                                 setReport={setReport}
                                 appData={appData}
                                 availableSubjects={availableSubjects}
-                                archive={archive}
                                 loadFromHistory={loadFromHistory}
                                 saveToArchive={saveToArchive}
                                 online={online}
