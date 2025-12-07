@@ -38,7 +38,7 @@ export interface ListData {
     tasks: string[];
 }
 
-export type TabId = 'general' | 'dailyReport' | 'notes' | 'statistics';
+export type TabId = 'dailyReport' | 'notes' | 'statistics';
 
 // User Menu Pages (accessed via avatar click)
 export type MenuPage = 'myAccount' | 'generalData' | 'myClasses' | 'systemSettings' | null;

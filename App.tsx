@@ -154,7 +154,6 @@ export default function App() {
 
     const getSteps = () => {
         return [
-            { id: 'general' as TabId, label: 'البيانات', status: getTabStatus('general') },
             { id: 'dailyReport' as TabId, label: 'السجل', status: getTabStatus('dailyReport') },
             { id: 'notes' as TabId, label: 'ملاحظات', status: getTabStatus('notes') },
             { id: 'statistics' as TabId, label: 'إحصاءات', status: 'complete' as const },
@@ -162,7 +161,9 @@ export default function App() {
     };
 
     const renderGeneralInfo = () => {
-        const isGeneralComplete = getTabStatus('general') === 'complete';
+        // Check completion directly since 'general' is no longer a TabId
+        const { id, name, school, level, sectionId, date } = report.general;
+        const isGeneralComplete = !!(id && name && school && level && sectionId && date);
         const sortedArchive = [...archive].sort((a, b) => b.savedAt - a.savedAt);
 
         return (
@@ -566,8 +567,6 @@ export default function App() {
                 {/* Tab Content (only show if no menu page is open) */}
                 {!currentMenuPage && (
                     <>
-                        {activeTab === 'general' && renderGeneralInfo()}
-                        
                         {activeTab === 'dailyReport' && (
                             <div className="space-y-4 animate-fade-in">
                                 {/* Quran Section */}
@@ -607,8 +606,21 @@ export default function App() {
                     setCurrentMenuPage(null); // Close any menu page
                     setActiveTab(tab);
                 }}
-                onSave={() => saveToArchive(online, setPendingCount)}
-                isFormComplete={getTabStatus('general') === 'complete' && getTabStatus('dailyReport') === 'complete'}
+                onNewReport={() => {
+                    setCurrentMenuPage(null);
+                    setActiveTab('dailyReport');
+                    // Reset form for new report
+                    setReport(prev => ({
+                        ...prev,
+                        general: { ...prev.general, date: new Date().toISOString().split('T')[0] },
+                        quranReport: '',
+                        firstClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
+                        secondClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
+                        hasSecondClass: false,
+                        notes: ''
+                    }));
+                }}
+                isFormComplete={getTabStatus('dailyReport') === 'complete'}
                 tabStatus={getTabStatus}
             />
 

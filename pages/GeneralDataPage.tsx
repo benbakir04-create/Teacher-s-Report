@@ -56,63 +56,54 @@ export function GeneralDataPage() {
                 </h3>
                 
                 <div className="space-y-4">
-                    {/* Registration ID - Disabled */}
+                    {/* Registration ID - LOCKED */}
                     <div>
                         <label className="block text-[11px] font-bold text-gray-500 mb-1">
-                            رقم التسجيل <span className="text-red-500">*</span>
+                            رقم التسجيل <span className="text-gray-400">(مقفل)</span>
                         </label>
                         <input
                             type="text"
                             value={data.registrationId}
-                            onChange={(e) => updateField('registrationId', e.target.value)}
-                            className={`w-full p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border ${errors.registrationId ? 'border-red-400 bg-red-50' : 'border-gray-200'} focus:border-primary outline-none transition`}
-                            placeholder="أدخل رقم التسجيل"
+                            readOnly
+                            disabled
+                            className="w-full p-3 bg-gray-100 text-gray-600 text-sm rounded-xl border border-gray-200 cursor-not-allowed"
+                            placeholder="يتم جلبه من النظام"
                         />
-                        {errors.registrationId && (
-                            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                <AlertCircle size={12} /> {errors.registrationId}
-                            </p>
-                        )}
+                        <p className="text-gray-400 text-xs mt-1">لا يمكن تعديله — مصدره الإدارة</p>
                     </div>
 
-                    {/* Full Name */}
+                    {/* Full Name - LOCKED */}
                     <div>
                         <label className="block text-[11px] font-bold text-gray-500 mb-1">
-                            الاسم الكامل <span className="text-red-500">*</span>
+                            الاسم الكامل <span className="text-gray-400">(مقفل)</span>
                         </label>
                         <input
                             type="text"
                             value={data.name}
-                            onChange={(e) => updateField('name', e.target.value)}
-                            className={`w-full p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border ${errors.name ? 'border-red-400 bg-red-50' : 'border-gray-200'} focus:border-primary outline-none transition`}
-                            placeholder="الاسم الثلاثي"
+                            readOnly
+                            disabled
+                            className="w-full p-3 bg-gray-100 text-gray-600 text-sm rounded-xl border border-gray-200 cursor-not-allowed"
+                            placeholder="يتم جلبه من النظام"
                         />
-                        {errors.name && (
-                            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                <AlertCircle size={12} /> {errors.name}
-                            </p>
-                        )}
+                        <p className="text-gray-400 text-xs mt-1">لا يمكن تعديله — مصدره الإدارة</p>
                     </div>
 
-                    {/* Email */}
+                    {/* Email - LOCKED (from Google) */}
                     <div>
                         <label className="block text-[11px] font-bold text-gray-500 mb-1">
                             <Mail size={12} className="inline ml-1" />
-                            البريد الإلكتروني <span className="text-red-500">*</span>
+                            البريد الإلكتروني <span className="text-gray-400">(مقفل)</span>
                         </label>
                         <input
                             type="email"
                             value={data.email}
-                            onChange={(e) => updateField('email', e.target.value)}
-                            className={`w-full p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border ${errors.email ? 'border-red-400 bg-red-50' : 'border-gray-200'} focus:border-primary outline-none transition`}
-                            placeholder="example@email.com"
+                            readOnly
+                            disabled
+                            className="w-full p-3 bg-gray-100 text-gray-600 text-sm rounded-xl border border-gray-200 cursor-not-allowed"
+                            placeholder="مرتبط بحساب Google"
                             dir="ltr"
                         />
-                        {errors.email && (
-                            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                <AlertCircle size={12} /> {errors.email}
-                            </p>
-                        )}
+                        <p className="text-gray-400 text-xs mt-1">مرتبط بحساب Google — يُعدَّل من الإعدادات</p>
                     </div>
 
                     {/* Phone (Optional) */}

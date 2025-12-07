@@ -217,11 +217,6 @@ export function useReportForm() {
     // Helper to get completion status
     const getTabStatus = (tab: TabId): CompletionStatus => {
         switch (tab) {
-            case 'general':
-                const { id, name, school, level, sectionId, date } = report.general;
-                if (id && name && school && level && sectionId && date) return 'complete';
-                if (id || name || school || level || sectionId) return 'partial';
-                return 'incomplete';
             case 'dailyReport':
                 // Combined status from quran + firstClass + (secondClass if enabled)
                 const quranComplete = report.quranReport.length > 5;

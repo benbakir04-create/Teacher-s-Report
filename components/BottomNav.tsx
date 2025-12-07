@@ -1,11 +1,11 @@
 import React from 'react';
-import { ClipboardList, Edit3, MessageSquare, BarChart2, Save } from 'lucide-react';
+import { Edit3, MessageSquare, BarChart2, Plus } from 'lucide-react';
 import { TabId, CompletionStatus } from '../types';
 
 interface BottomNavProps {
     activeTab: TabId;
     onTabChange: (tab: TabId) => void;
-    onSave: () => void;
+    onNewReport: () => void;
     isFormComplete: boolean;
     tabStatus?: (tab: TabId) => CompletionStatus;
 }
@@ -13,13 +13,13 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({ 
     activeTab, 
     onTabChange, 
-    onSave, 
+    onNewReport,
     isFormComplete,
     tabStatus 
 }) => {
     
+    // Only 3 tabs now (no 'general' - it's in Avatar Menu)
     const navItems = [
-        { id: 'general' as TabId, label: 'البيانات', icon: ClipboardList },
         { id: 'dailyReport' as TabId, label: 'السجل', icon: Edit3 },
         { id: 'notes' as TabId, label: 'ملاحظات', icon: MessageSquare },
         { id: 'statistics' as TabId, label: 'إحصاءات', icon: BarChart2 },
@@ -27,32 +27,31 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
     return (
         <>
-            {/* Floating Save Button (FAB) - Bottom Left (RTL) */}
-            <div className="fixed bottom-[90px] left-6 z-50 pointer-events-auto animate-bounce-subtle">
+            {/* Central FAB Button - + تقرير جديد */}
+            <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
                 <button
-                    onClick={onSave}
-                    disabled={!isFormComplete}
-                    className={`
-                        w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl border-2 border-white transition-all duration-300 transform hover:scale-110 active:scale-95
-                        ${isFormComplete 
-                            ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-green-200' 
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed grayscale'
-                        }
-                    `}
+                    onClick={onNewReport}
+                    className="w-16 h-16 rounded-full flex items-center justify-center shadow-2xl border-4 border-white transition-all duration-300 transform hover:scale-110 active:scale-95 bg-gradient-to-br from-primary to-secondary text-white"
                 >
-                    <Save size={24} />
+                    <Plus size={28} strokeWidth={3} />
                 </button>
+                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-primary whitespace-nowrap">
+                    تقرير جديد
+                </span>
             </div>
 
             <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
                 {/* The Background Bar */}
                 <div className="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] h-[70px] rounded-t-[25px] pointer-events-auto border-t border-gray-100"></div>
 
-                <div className="relative flex justify-around items-end h-[70px] px-2 pb-2 pointer-events-auto max-w-md mx-auto">
-                    {navItems.map((item) => {
+                <div className="relative flex justify-around items-end h-[70px] px-4 pb-2 pointer-events-auto max-w-md mx-auto">
+                    {navItems.map((item, index) => {
                         const isActive = activeTab === item.id;
                         const status = tabStatus ? tabStatus(item.id) : 'incomplete';
                         const Icon = item.icon;
+                        
+                        // Add space in middle for FAB
+                        const marginClass = index === 1 ? 'mx-8' : '';
                         
                         let StatusIndicator = null;
                         if (!isActive && tabStatus) {
@@ -67,7 +66,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                             <button
                                 key={item.id}
                                 onClick={() => onTabChange(item.id)}
-                                className="relative group flex flex-col items-center justify-end pb-2 w-14 transition-all duration-300 focus:outline-none"
+                                className={`relative group flex flex-col items-center justify-end pb-2 w-16 transition-all duration-300 focus:outline-none ${marginClass}`}
                             >
                                 <div 
                                     className={`absolute transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) flex items-center justify-center rounded-full
