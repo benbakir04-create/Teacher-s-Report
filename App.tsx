@@ -8,7 +8,14 @@ import { Dashboard } from './Dashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { EmailLinkModal } from './components/EmailLinkModal';
 import { AccountModal } from './components/AccountModal';
-import { TabId } from './types';
+import { UserMenu } from './components/UserMenu';
+import { TabId, MenuPage } from './types';
+
+// Page Components
+import { MyAccountPage } from './pages/MyAccountPage';
+import { GeneralDataPage } from './pages/GeneralDataPage';
+import { MyClassesPage } from './pages/MyClassesPage';
+import { SystemSettingsPage } from './pages/SystemSettingsPage';
 import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, WifiOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Toaster } from 'react-hot-toast';
@@ -87,6 +94,8 @@ export default function App() {
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [userImage, setUserImage] = useState<string | null>(null);
     const [openAccordion, setOpenAccordion] = useState<string | null>('strategies');
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const [currentMenuPage, setCurrentMenuPage] = useState<MenuPage>(null);
 
     // Sync Auth with Report
     useEffect(() => {
@@ -144,20 +153,12 @@ export default function App() {
     };
 
     const getSteps = () => {
-        const steps = [
-            { id: 'general' as TabId, label: 'عامة', status: getTabStatus('general') },
-            { id: 'quran' as TabId, label: 'قرآن', status: getTabStatus('quran') },
-            { id: 'class1' as TabId, label: 'حصة 1', status: getTabStatus('class1') },
+        return [
+            { id: 'general' as TabId, label: 'البيانات', status: getTabStatus('general') },
+            { id: 'dailyReport' as TabId, label: 'السجل', status: getTabStatus('dailyReport') },
+            { id: 'notes' as TabId, label: 'ملاحظات', status: getTabStatus('notes') },
+            { id: 'statistics' as TabId, label: 'إحصاءات', status: 'complete' as const },
         ];
-
-        if (report.hasSecondClass) {
-            steps.push({ id: 'class2' as TabId, label: 'حصة 2', status: getTabStatus('class2') });
-        }
-
-        steps.push({ id: 'notes' as TabId, label: 'ملاحظات', status: getTabStatus('notes') });
-        steps.push({ id: 'dashboard' as TabId, label: 'إحصائيات', status: 'complete' });
-
-        return steps;
     };
 
     const renderGeneralInfo = () => {
@@ -296,7 +297,8 @@ export default function App() {
 
     const renderClassInfo = (classType: 'firstClass' | 'secondClass') => {
         const data = report[classType];
-        const isComplete = getTabStatus(classType === 'firstClass' ? 'class1' : 'class2') === 'complete';
+        // For now, we keep the function but it will be rendered inside dailyReport tab
+        const isComplete = data.subject !== '' && data.lesson !== '' && data.strategies.length > 0;
         const label = classType === 'firstClass' ? 'الحصة الأولى' : 'الحصة الثانية';
 
         const toggleAccordion = (section: string) => {
@@ -532,50 +534,81 @@ export default function App() {
                     teacherName={report.general.name} 
                     userImage={userImage}
                     onQrClick={() => setIsQrModalOpen(true)}
-                    onAvatarClick={() => setShowAccountModal(true)}
+                    onAvatarClick={() => setShowUserMenu(true)}
                 />
                 
-                <div className="px-4 pb-6">
-                    <ProgressStepper 
-                        steps={getSteps()} 
-                        currentStep={activeTab} 
-                        onStepClick={setActiveTab} 
-                    />
-                </div>
-            </div>
-
-            <div className="max-w-md mx-auto px-4">
-                {activeTab === 'general' && renderGeneralInfo()}
-                {activeTab === 'quran' && renderQuranInfo()}
-                {activeTab === 'class1' && renderClassInfo('firstClass')}
-                {activeTab === 'class2' && renderClassInfo('secondClass')}
-                
-                {activeTab === 'notes' && (
-                    <div className="animate-fade-in bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                        <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
-                            <MessageSquare size={18} /> ملاحظات إضافية
-                        </h3>
-                        <textarea
-                            value={report.notes}
-                            onChange={(e) => setReport(prev => ({ ...prev, notes: e.target.value }))}
-                            className="w-full h-32 p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none transition leading-relaxed"
-                            placeholder="اكتب أي ملاحظات إضافية هنا..."
-                        ></textarea>
+                {/* Show stepper only when no menu page is open */}
+                {!currentMenuPage && (
+                    <div className="px-4 pb-6">
+                        <ProgressStepper 
+                            steps={getSteps()} 
+                            currentStep={activeTab} 
+                            onStepClick={setActiveTab} 
+                        />
                     </div>
                 )}
+            </div>
+            
+            {/* User Menu Sidebar */}
+            <UserMenu 
+                isOpen={showUserMenu}
+                onClose={() => setShowUserMenu(false)}
+                onNavigate={(page) => setCurrentMenuPage(page)}
+            />
 
-                {activeTab === 'dashboard' && <Dashboard stats={statsData} />}
+            <div className="max-w-md mx-auto px-4">
+                {/* Menu Pages (from avatar click) */}
+                {currentMenuPage === 'myAccount' && <MyAccountPage />}
+                {currentMenuPage === 'generalData' && <GeneralDataPage />}
+                {currentMenuPage === 'myClasses' && <MyClassesPage />}
+                {currentMenuPage === 'systemSettings' && <SystemSettingsPage />}
                 
-                {activeTab === 'about' && <AboutProject />}
+                {/* Tab Content (only show if no menu page is open) */}
+                {!currentMenuPage && (
+                    <>
+                        {activeTab === 'general' && renderGeneralInfo()}
+                        
+                        {activeTab === 'dailyReport' && (
+                            <div className="space-y-4 animate-fade-in">
+                                {/* Quran Section */}
+                                {renderQuranInfo()}
+                                
+                                {/* Class 1 */}
+                                {renderClassInfo('firstClass')}
+                                
+                                {/* Class 2 (if enabled) */}
+                                {report.hasSecondClass && renderClassInfo('secondClass')}
+                            </div>
+                        )}
+                        
+                        {activeTab === 'notes' && (
+                            <div className="animate-fade-in bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
+                                    <MessageSquare size={18} /> ملاحظات إضافية
+                                </h3>
+                                <textarea
+                                    value={report.notes}
+                                    onChange={(e) => setReport(prev => ({ ...prev, notes: e.target.value }))}
+                                    className="w-full h-32 p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none transition leading-relaxed"
+                                    placeholder="اكتب أي ملاحظات إضافية هنا..."
+                                ></textarea>
+                            </div>
+                        )}
+
+                        {activeTab === 'statistics' && <Dashboard stats={statsData} />}
+                    </>
+                )}
             </div>
 
             {/* Bottom Navigation */}
             <BottomNav 
                 activeTab={activeTab} 
-                onTabChange={setActiveTab}
+                onTabChange={(tab) => {
+                    setCurrentMenuPage(null); // Close any menu page
+                    setActiveTab(tab);
+                }}
                 onSave={() => saveToArchive(online, setPendingCount)}
-                isFormComplete={getTabStatus('general') === 'complete' && getTabStatus('class1') === 'complete'}
-                hasSecondClass={report.hasSecondClass}
+                isFormComplete={getTabStatus('general') === 'complete' && getTabStatus('dailyReport') === 'complete'}
                 tabStatus={getTabStatus}
             />
 

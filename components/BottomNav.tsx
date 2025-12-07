@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BookOpen, FileText, ChartColumn, Book, Info, Save } from 'lucide-react';
+import { ClipboardList, Edit3, MessageSquare, BarChart2, Save } from 'lucide-react';
 import { TabId, CompletionStatus } from '../types';
 
 interface BottomNavProps {
@@ -7,7 +7,6 @@ interface BottomNavProps {
     onTabChange: (tab: TabId) => void;
     onSave: () => void;
     isFormComplete: boolean;
-    hasSecondClass?: boolean;
     tabStatus?: (tab: TabId) => CompletionStatus;
 }
 
@@ -16,18 +15,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     onTabChange, 
     onSave, 
     isFormComplete,
-    hasSecondClass = false,
     tabStatus 
 }) => {
     
     const navItems = [
-        { id: 'general' as TabId, label: 'عامة', icon: Home },
-        { id: 'quran' as TabId, label: 'قرآن', icon: Book },
-        { id: 'class1' as TabId, label: 'حصة 1', icon: BookOpen },
-        ...(hasSecondClass ? [{ id: 'class2' as TabId, label: 'حصة 2', icon: BookOpen }] : []),
-        { id: 'notes' as TabId, label: 'ملاحظات', icon: FileText },
-        { id: 'dashboard' as TabId, label: 'إحصائيات', icon: ChartColumn },
-        { id: 'about' as TabId, label: 'عن المشروع', icon: Info },
+        { id: 'general' as TabId, label: 'البيانات', icon: ClipboardList },
+        { id: 'dailyReport' as TabId, label: 'السجل', icon: Edit3 },
+        { id: 'notes' as TabId, label: 'ملاحظات', icon: MessageSquare },
+        { id: 'statistics' as TabId, label: 'إحصاءات', icon: BarChart2 },
     ];
 
     return (

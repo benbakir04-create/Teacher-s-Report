@@ -38,7 +38,10 @@ export interface ListData {
     tasks: string[];
 }
 
-export type TabId = 'general' | 'quran' | 'class1' | 'class2' | 'notes' | 'dashboard' | 'about';
+export type TabId = 'general' | 'dailyReport' | 'notes' | 'statistics';
+
+// User Menu Pages (accessed via avatar click)
+export type MenuPage = 'myAccount' | 'generalData' | 'myClasses' | 'systemSettings' | null;
 
 export type CompletionStatus = 'complete' | 'partial' | 'incomplete';
 

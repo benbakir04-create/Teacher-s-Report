@@ -222,18 +222,21 @@ export function useReportForm() {
                 if (id && name && school && level && sectionId && date) return 'complete';
                 if (id || name || school || level || sectionId) return 'partial';
                 return 'incomplete';
-            case 'quran':
-                if (report.quranReport.length > 5) return 'complete';
-                if (report.quranReport.length > 0) return 'partial';
+            case 'dailyReport':
+                // Combined status from quran + firstClass + (secondClass if enabled)
+                const quranComplete = report.quranReport.length > 5;
+                const class1Status = getClassStatus(report.firstClass);
+                const class2Status = report.hasSecondClass ? getClassStatus(report.secondClass) : 'complete';
+                
+                if (quranComplete && class1Status === 'complete' && class2Status === 'complete') return 'complete';
+                if (report.quranReport.length > 0 || class1Status !== 'incomplete') return 'partial';
                 return 'incomplete';
-            case 'class1':
-                return getClassStatus(report.firstClass);
-            case 'class2':
-                return getClassStatus(report.secondClass);
             case 'notes':
                 if (report.notes.length > 5) return 'complete';
                 if (report.notes.length > 0) return 'partial';
                 return 'incomplete';
+            case 'statistics':
+                return 'complete'; // Always complete
             default:
                 return 'complete';
         }
