@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
-import { CheckboxGrid } from './components/CheckboxGrid';
-import { ProgressStepper } from './components/ProgressStepper';
 import { AboutProject } from './components/AboutProject';
 import { Dashboard } from './Dashboard';
 import { LoginScreen } from './components/LoginScreen';
@@ -16,7 +14,9 @@ import { MyAccountPage } from './pages/MyAccountPage';
 import { GeneralDataPage } from './pages/GeneralDataPage';
 import { MyClassesPage } from './pages/MyClassesPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
-import { ChevronDown, User, Building, BookOpen, MessageSquare, School, Save, RefreshCw, WifiOff } from 'lucide-react';
+import { DailyReportPage } from './pages/DailyReportPage';
+
+import { MessageSquare, WifiOff, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Toaster } from 'react-hot-toast';
 
@@ -25,28 +25,14 @@ import { useAuth } from './hooks/useAuth';
 import { useReportForm } from './hooks/useReportForm';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { useAppData } from './hooks/useAppData';
-import { getLessonsForSubject } from './dataManager';
-
-// Helper to format date as YYYY/MM/DD
-const formatDateDisplay = (dateString: string): string => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${year}/${month}/${day}`;
-};
 
 export default function App() {
     console.log('🚀 App Rendering...');
     // 1. Auth Hook
     const { 
         authSession, 
-        setAuthSession, 
         isAuthenticating, 
         showEmailLinkModal, 
-        setShowEmailLinkModal,
         showAccountModal, 
         setShowAccountModal, 
         handleLogin, 
@@ -93,9 +79,9 @@ export default function App() {
     const [qrDataUrl, setQrDataUrl] = useState<string>('');
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [userImage, setUserImage] = useState<string | null>(null);
-    const [openAccordion, setOpenAccordion] = useState<string | null>('strategies');
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [currentMenuPage, setCurrentMenuPage] = useState<MenuPage>(null);
+    const [activeSubTab, setActiveSubTab] = useState<'form' | 'list'>('form');
 
     // Sync Auth with Report
     useEffect(() => {
@@ -113,11 +99,6 @@ export default function App() {
             }));
         }
     }, [authSession]);
-
-    // Reset accordion state when switching tabs
-    useEffect(() => {
-        setOpenAccordion('strategies');
-    }, [activeTab]);
 
     // Generate QR Code data
     useEffect(() => {
@@ -152,295 +133,6 @@ export default function App() {
         reader.readAsDataURL(file);
     };
 
-    const getSteps = () => {
-        return [
-            { id: 'dailyReport' as TabId, label: 'السجل', status: getTabStatus('dailyReport') },
-            { id: 'notes' as TabId, label: 'ملاحظات', status: getTabStatus('notes') },
-            { id: 'statistics' as TabId, label: 'إحصاءات', status: 'complete' as const },
-        ];
-    };
-
-    const renderGeneralInfo = () => {
-        // Check completion directly since 'general' is no longer a TabId
-        const { id, name, school, level, sectionId, date } = report.general;
-        const isGeneralComplete = !!(id && name && school && level && sectionId && date);
-        const sortedArchive = [...archive].sort((a, b) => b.savedAt - a.savedAt);
-
-        return (
-        <div className="space-y-4 animate-fade-in">
-            <div className={`bg-white p-4 rounded-2xl shadow-sm border transition-colors duration-300 ${isGeneralComplete ? 'border-green-200 ring-1 ring-green-100' : 'border-gray-100'}`}>
-                <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
-                    <User size={18} /> البيانات الأساسية
-                </h3>
-                
-                <div className="space-y-3">
-                    {/* Compact Row for ID and Name */}
-                    <div className="flex gap-3">
-                        <div className="w-[35%]">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">رقم التسجيل</label>
-                            <input
-                                type="text"
-                                value={report.general.id}
-                                onChange={(e) => handleGeneralChange('id', e.target.value)}
-                                className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
-                                placeholder="10293"
-                            />
-                        </div>
-                        <div className="w-[65%]">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">اسم المعلم</label>
-                            <input
-                                type="text"
-                                value={report.general.name}
-                                onChange={(e) => handleGeneralChange('name', e.target.value)}
-                                className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
-                                placeholder="الاسم الثلاثي"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1">اسم المدرسة</label>
-                        <div className="relative">
-                            <select
-                                value={report.general.school}
-                                onChange={(e) => handleGeneralChange('school', e.target.value)}
-                                className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
-                            >
-                                <option value="">اختر المدرسة...</option>
-                                {appData.schools.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <Building size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                        </div>
-                    </div>
-
-                    {/* Grade and Section on same row: 70% / 30% */}
-                    <div className="flex gap-3">
-                        <div className="w-[70%]">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">المستوى الدراسي</label>
-                            <div className="relative">
-                                <select
-                                    value={report.general.level}
-                                    onChange={(e) => handleGeneralChange('level', e.target.value)}
-                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
-                                >
-                                    <option value="">اختر المستوى...</option>
-                                    {appData.levels.map(l => <option key={l} value={l}>{l}</option>)}
-                                </select>
-                                <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            </div>
-                        </div>
-                        <div className="w-[30%]">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">معرف القسم</label>
-                            <div className="relative">
-                                <select
-                                    value={report.general.sectionId}
-                                    onChange={(e) => handleGeneralChange('sectionId', e.target.value)}
-                                    className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
-                                >
-                                    <option value="">اختر...</option>
-                                    {appData.sections.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <School size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Date Section with History Loader */}
-                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mt-2">
-                        <div className="mb-3 relative">
-                            <select
-                                onChange={(e) => loadFromHistory(e.target.value)}
-                                className="w-full p-2 pl-8 text-xs bg-white text-primary font-bold rounded-lg border border-primary/30 outline-none focus:ring-2 focus:ring-primary/20 text-gray-900"
-                                value=""
-                            >
-                                <option value="" disabled>📂 استرجاع تقرير سابق...</option>
-                                {sortedArchive.map(item => (
-                                    <option key={item.uid} value={item.uid}>
-                                        {formatDateDisplay(item.general.date)} - {item.general.sectionId}
-                                    </option>
-                                ))}
-                            </select>
-                            <RefreshCw size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
-                        </div>
-
-                        <div className="relative">
-                            <input
-                                type={dateInputType}
-                                value={dateInputType === 'date' ? report.general.date : formatDateDisplay(report.general.date)}
-                                onChange={(e) => handleGeneralChange('date', e.target.value)}
-                                onFocus={() => setDateInputType('date')}
-                                onBlur={() => setDateInputType('text')}
-                                dir="rtl"
-                                className="w-full p-2 bg-white text-gray-900 text-sm font-bold rounded-lg border border-gray-300 focus:border-primary outline-none text-right"
-                                placeholder="اليوم / الشهر / السنة"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-    }
-
-    const renderQuranInfo = () => (
-        <div className="animate-fade-in bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <h3 className="text-base font-bold text-primary mb-3 flex items-center gap-2">
-                <BookOpen size={18} /> تقرير حصة القرآن
-            </h3>
-            <textarea
-                value={report.quranReport}
-                onChange={(e) => setReport(prev => ({ ...prev, quranReport: e.target.value }))}
-                className="w-full h-32 p-3 bg-gray-50 text-gray-900 text-sm rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none transition leading-relaxed"
-                placeholder="اكتب تقريرك عن حصة القرآن هنا..."
-            ></textarea>
-        </div>
-    );
-
-    const renderClassInfo = (classType: 'firstClass' | 'secondClass') => {
-        const data = report[classType];
-        // For now, we keep the function but it will be rendered inside dailyReport tab
-        const isComplete = data.subject !== '' && data.lesson !== '' && data.strategies.length > 0;
-        const label = classType === 'firstClass' ? 'الحصة الأولى' : 'الحصة الثانية';
-
-        const toggleAccordion = (section: string) => {
-            setOpenAccordion(prev => prev === section ? null : section);
-        };
-
-        return (
-            <div className="space-y-4 animate-fade-in pb-20">
-                {classType === 'firstClass' && (
-                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-primary">
-                                <BookOpen size={16} />
-                            </div>
-                            <span className="text-sm font-bold text-gray-700">هل توجد حصة ثانية؟</span>
-                        </div>
-                        <div className="flex bg-gray-100 p-1 rounded-lg gap-1">
-                            <button
-                                onClick={() => setReport(prev => ({ ...prev, hasSecondClass: true }))}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-300 
-                                    ${report.hasSecondClass 
-                                        ? 'bg-primary text-white shadow-md transform scale-105' 
-                                        : 'text-gray-400 hover:bg-gray-200'
-                                    }`}
-                            >
-                                نعم
-                            </button>
-                            <button
-                                onClick={() => setReport(prev => ({ ...prev, hasSecondClass: false }))}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-300 
-                                    ${!report.hasSecondClass 
-                                        ? 'bg-primary text-white shadow-md transform scale-105' 
-                                        : 'text-gray-400 hover:bg-gray-200'
-                                    }`}
-                            >
-                                لا
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className={`bg-white p-4 rounded-2xl shadow-sm border transition-colors duration-300 ${isComplete ? 'border-green-200 ring-1 ring-green-100' : 'border-gray-100'}`}>
-                    <h3 className="text-base font-bold text-primary mb-4 flex items-center gap-2">
-                        <BookOpen size={18} /> {label}
-                    </h3>
-                    
-                    <div className="space-y-4">
-                        {/* Subject & Lesson */}
-                        <div className="grid grid-cols-[2fr_3fr] gap-3">
-                            <div>
-                                <label className="block text-[10px] font-bold text-gray-500 mb-1">المادة</label>
-                                <div className="relative">
-                                    <select
-                                        value={data.subject}
-                                        onChange={(e) => handleClassChange(classType, 'subject', e.target.value)}
-                                        className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
-                                    >
-                                        <option value="">اختر...</option>
-                                        {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-gray-500 mb-1">عنوان الدرس</label>
-                                <div className="relative">
-                                    <select
-                                        value={data.lesson}
-                                        onChange={(e) => handleClassChange(classType, 'lesson', e.target.value)}
-                                        className="w-full p-2 bg-gray-50 text-gray-900 text-sm rounded-lg border border-gray-200 appearance-none focus:border-primary outline-none"
-                                    >
-                                        <option value="">اختر الدرس...</option>
-                                        {getLessonsForSubject(data.subject, report.general.level, data.gender).map(lesson => (
-                                            <option key={lesson} value={lesson}>{lesson}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Gender Selection for Fiqh/4th Grade */}
-                        {report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && data.subject.includes('فقه') && (
-                            <div className="bg-gradient-to-r from-blue-50 to-pink-50 p-3 rounded-xl border border-gray-100 animate-fade-in">
-                                <label className="block text-[10px] font-bold text-gray-600 mb-2">جنس الطلاب (مطلوب للفقه - رابعة متوسط)</label>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleClassChange(classType, 'gender', 'بنين')}
-                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                                            data.gender === 'بنين' 
-                                            ? 'bg-emerald-500 text-white shadow-md' 
-                                            : 'bg-white text-gray-500 border border-emerald-200 hover:bg-emerald-50'
-                                        }`}
-                                    >
-                                        <span>ذكور</span>
-                                        <span className="text-[9px] opacity-70">فقه المعاملات</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleClassChange(classType, 'gender', 'بنات')}
-                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                                            data.gender === 'بنات' 
-                                            ? 'bg-pink-400 text-white shadow-md' 
-                                            : 'bg-white text-gray-500 border border-pink-200 hover:bg-pink-50'
-                                        }`}
-                                    >
-                                        <span>إناث</span>
-                                        <span className="text-[9px] opacity-70">فقه النساء</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Strategies */}
-                        <CheckboxGrid
-                            items={appData.strategies}
-                            selected={data.strategies}
-                            onChange={(selected) => handleClassChange(classType, 'strategies', selected)}
-                            label="استراتيجيات التدريس"
-                        />
-
-                        {/* Tools */}
-                        <CheckboxGrid
-                            items={appData.tools}
-                            selected={data.tools}
-                            onChange={(selected) => handleClassChange(classType, 'tools', selected)}
-                            label="الوسائل التعليمية"
-                        />
-
-                        {/* Tasks */}
-                        <CheckboxGrid
-                            items={appData.tasks}
-                            selected={data.tasks}
-                            onChange={(selected) => handleClassChange(classType, 'tasks', selected)}
-                            label="المهام المنجزة"
-                        />
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     // Show loading while checking authentication
     if (isAuthenticating) {
         return (
@@ -458,7 +150,6 @@ export default function App() {
         return <LoginScreen onLogin={handleLogin} />;
     }
 
-    console.log('✅ App Rendering Main Content');
     return (
         <>
             {/* Connection Status Indicator */}
@@ -529,7 +220,7 @@ export default function App() {
 
             
             <div className="min-h-screen pb-[90px] bg-[#f3f4f6]">
-            {/* Integrated Header and Stepper Wrapper */}
+            {/* Header */}
             <div className="bg-gradient-to-bl from-[#667eea] to-[#764ba2] rounded-b-[30px] shadow-lg mb-4">
                 <Header 
                     teacherName={report.general.name} 
@@ -537,17 +228,6 @@ export default function App() {
                     onQrClick={() => setIsQrModalOpen(true)}
                     onAvatarClick={() => setShowUserMenu(true)}
                 />
-                
-                {/* Show stepper only when no menu page is open */}
-                {!currentMenuPage && (
-                    <div className="px-4 pb-6">
-                        <ProgressStepper 
-                            steps={getSteps()} 
-                            currentStep={activeTab} 
-                            onStepClick={setActiveTab} 
-                        />
-                    </div>
-                )}
             </div>
             
             {/* User Menu Sidebar */}
@@ -568,16 +248,23 @@ export default function App() {
                 {!currentMenuPage && (
                     <>
                         {activeTab === 'dailyReport' && (
-                            <div className="space-y-4 animate-fade-in">
-                                {/* Quran Section */}
-                                {renderQuranInfo()}
-                                
-                                {/* Class 1 */}
-                                {renderClassInfo('firstClass')}
-                                
-                                {/* Class 2 (if enabled) */}
-                                {report.hasSecondClass && renderClassInfo('secondClass')}
-                            </div>
+                            <DailyReportPage 
+                                report={report}
+                                setReport={setReport}
+                                appData={appData}
+                                availableSubjects={availableSubjects}
+                                archive={archive}
+                                loadFromHistory={loadFromHistory}
+                                saveToArchive={saveToArchive}
+                                online={online}
+                                setPendingCount={setPendingCount}
+                                dateInputType={dateInputType}
+                                setDateInputType={setDateInputType}
+                                handleGeneralChange={handleGeneralChange}
+                                handleClassChange={handleClassChange}
+                                activeSubTab={activeSubTab}
+                                setActiveSubTab={setActiveSubTab}
+                            />
                         )}
                         
                         {activeTab === 'notes' && (
@@ -605,20 +292,48 @@ export default function App() {
                 onTabChange={(tab) => {
                     setCurrentMenuPage(null); // Close any menu page
                     setActiveTab(tab);
+                    // If switching to DailyReport, default to List view (optional, or stick to current)
                 }}
                 onNewReport={() => {
                     setCurrentMenuPage(null);
-                    setActiveTab('dailyReport');
-                    // Reset form for new report
-                    setReport(prev => ({
-                        ...prev,
-                        general: { ...prev.general, date: new Date().toISOString().split('T')[0] },
-                        quranReport: '',
-                        firstClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
-                        secondClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
-                        hasSecondClass: false,
-                        notes: ''
-                    }));
+                    
+                    // Logic for Smart FAB
+                    if (activeTab === 'dailyReport') {
+                        // Already in Daily Report
+                        if (activeSubTab === 'list') {
+                            // Switch to Form
+                            setActiveSubTab('form');
+                        } else {
+                            // Already in Form - Check for unsaved changes
+                            const isDirty = report.quranReport || report.firstClass.subject || report.notes;
+                            if (isDirty) {
+                                if (confirm("هل تريد حفظ البيانات كمسودة قبل فتح تقرير جديد؟")) {
+                                    // User wants to save - logic is handled by UI save button mostly, 
+                                    // but here we just respect their choice to STAY or we could force save.
+                                    // For simplicity per spec: "shows confirmation... if unsaved"
+                                    // If they say OK (Save/Stay), we do nothing (let them save).
+                                    // If they Cancel (Discard), we reset.
+                                } else {
+                                    // Discard and Reset
+                                    setReport(prev => ({
+                                        ...prev,
+                                        general: { ...prev.general, date: new Date().toISOString().split('T')[0] },
+                                        quranReport: '',
+                                        firstClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
+                                        secondClass: { subject: '', lesson: '', strategies: [], tools: [], tasks: [], gender: '' },
+                                        hasSecondClass: false,
+                                        notes: ''
+                                    }));
+                                    toast.success("تم فتح تقرير جديد");
+                                }
+                            }
+                            // If not dirty, do nothing (already ready)
+                        }
+                    } else {
+                        // Switch from other tab
+                        setActiveTab('dailyReport');
+                        setActiveSubTab('form');
+                    }
                 }}
                 isFormComplete={getTabStatus('dailyReport') === 'complete'}
                 tabStatus={getTabStatus}

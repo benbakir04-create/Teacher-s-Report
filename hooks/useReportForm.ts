@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReportData, TabId, ClassData, ArchivedReport, CompletionStatus } from '../types';
 import { saveReport, saveBackup, logError } from '../services/googleSheetsService';
 import { savePendingReport, isOnline, saveUserData as saveUserDataToStorage, getSavedUserData } from '../services/offlineService';
@@ -31,7 +31,7 @@ const initialReport: ReportData = {
 
 export function useReportForm() {
     const [report, setReport] = useState<ReportData>(initialReport);
-    const [activeTab, setActiveTab] = useState<TabId>('general');
+    const [activeTab, setActiveTab] = useState<TabId>('dailyReport');
     const [archive, setArchive] = useState<ArchivedReport[]>([]);
     const [dateInputType, setDateInputType] = useState<'text' | 'date'>('text');
 
@@ -125,20 +125,20 @@ export function useReportForm() {
         // Validation
         if (!report.general.name || !report.general.school || !report.general.level || !report.general.sectionId || !report.general.date) {
             toast.error("يرجى إكمال جميع البيانات الأساسية (الاسم، المدرسة، المستوى، القسم، التاريخ)");
-            setActiveTab('general');
+            setActiveTab('dailyReport');
             return;
         }
 
         const c1 = report.firstClass;
         if (!c1.subject || !c1.lesson || c1.strategies.length === 0 || c1.tools.length === 0 || c1.tasks.length === 0) {
              toast.error("يرجى إكمال جميع بيانات الحصة الأولى (المادة، الدرس، الاستراتيجيات، الوسائل، المهام)");
-             setActiveTab('class1');
+             setActiveTab('dailyReport');
              return;
         }
 
         if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c1.subject.includes('فقه') && !c1.gender) {
             toast.error("يرجى اختيار الجنس للحصة الأولى");
-            setActiveTab('class1');
+            setActiveTab('dailyReport');
             return;
         }
 
@@ -146,13 +146,13 @@ export function useReportForm() {
             const c2 = report.secondClass;
             if (!c2.subject || !c2.lesson || c2.strategies.length === 0 || c2.tools.length === 0 || c2.tasks.length === 0) {
                 toast.error("يرجى إكمال جميع بيانات الحصة الثانية");
-                setActiveTab('class2');
+                setActiveTab('dailyReport');
                 return;
             }
             
             if (report.general.level.includes('الرابعة') && report.general.level.includes('متوسط') && c2.subject.includes('فقه') && !c2.gender) {
                 toast.error("يرجى اختيار الجنس للحصة الثانية");
-                setActiveTab('class2');
+                setActiveTab('dailyReport');
                 return;
             }
         }
@@ -211,7 +211,7 @@ export function useReportForm() {
             notes: ''
         }));
         
-        setActiveTab('general');
+        setActiveTab('dailyReport');
     };
 
     // Helper to get completion status

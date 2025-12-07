@@ -24,7 +24,11 @@ export interface ReportData {
     secondClass: ClassData;
     hasSecondClass: boolean;
     notes: string;
+}
 
+export interface ArchivedReport extends ReportData {
+    uid: string;
+    savedAt: number;
 }
 
 export interface ListData {
@@ -61,6 +65,7 @@ export interface SubjectProgress {
   total: number;
   percentage: number;
   overdue: number;
+  notes?: string;
 }
 
 export interface TeacherStats {
