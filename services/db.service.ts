@@ -12,12 +12,25 @@ export interface StoredReport {
     createdAt: number;
 }
 
+// General Data for teacher profile
+export interface GeneralData {
+    registrationId: string;
+    name: string;
+    email: string;
+    phone?: string;
+    school: string;
+    level: string;
+    sectionNumber: string;
+    updatedAt: number;
+}
+
 const DB_NAME = 'teacher-report-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented for config store
 const STORES = {
     REPORTS: 'reports',
     SYNC_QUEUE: 'syncQueue',
-    SETTINGS: 'settings'
+    SETTINGS: 'settings',
+    CONFIG: 'config'
 };
 
 class DBService {
@@ -65,6 +78,11 @@ class DBService {
                 // Settings Store
                 if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
                     db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
+                }
+
+                // Config Store (for GeneralData)
+                if (!db.objectStoreNames.contains(STORES.CONFIG)) {
+                    db.createObjectStore(STORES.CONFIG, { keyPath: 'key' });
                 }
             };
         });
@@ -185,6 +203,36 @@ class DBService {
 
     async getPendingCount(): Promise<number> {
         return this.count(STORES.SYNC_QUEUE);
+    }
+
+    // --- General Data (Config) ---
+
+    async saveGeneralData(data: GeneralData): Promise<void> {
+        await this.add(STORES.CONFIG, {
+            key: 'generalData',
+            ...data,
+            updatedAt: Date.now()
+        });
+    }
+
+    async getGeneralData(): Promise<GeneralData | null> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.CONFIG], 'readonly');
+            const store = transaction.objectStore(STORES.CONFIG);
+            const request = store.get('generalData');
+
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result) {
+                    const { key, ...data } = result;
+                    resolve(data as GeneralData);
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
     }
 }
 
