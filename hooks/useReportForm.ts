@@ -3,6 +3,7 @@ import { ReportData, TabId, ClassData, CompletionStatus } from '../types';
 import { saveReport, saveBackup, logError } from '../services/googleSheetsService';
 import { savePendingReport, getSavedUserData, saveUserData as saveUserDataToStorage } from '../services/offlineService';
 import { dbService } from '../services/db.service';
+import { syncService } from '../services/syncService';
 import toast from 'react-hot-toast';
 
 const initialClassData: ClassData = {
@@ -216,10 +217,17 @@ export function useReportForm() {
             // 2. Delete Draft associated with this report
             await dbService.deleteDraft(report.general.sectionId, report.general.date);
 
-            // 3. Sync Logic (Google Sheets)
+            // 3. Queue for Cloud Sync (Phase 7)
+            await syncService.queueForSync('report', reportToSave);
+
+            // 4. Legacy Google Sheets Sync (will be removed in future)
             if (online) {
-                await saveReport(reportToSave);
-                await saveBackup(reportToSave);
+                try {
+                    await saveReport(reportToSave);
+                    await saveBackup(reportToSave);
+                } catch (sheetError) {
+                    console.warn('Google Sheets sync failed, data is in cloud queue:', sheetError);
+                }
                 toast.success("تم حفظ التقرير بنجاح!");
                 setPendingCount(0);
             } else {

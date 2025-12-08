@@ -2,6 +2,9 @@ import React from 'react';
 import { User, Settings, Users, Cog, X } from 'lucide-react';
 import { MenuPage } from '../types';
 
+import { useUser } from '../hooks/useUser';
+import { can } from '../services/permissionService';
+
 interface UserMenuProps {
     isOpen: boolean;
     onClose: () => void;
@@ -9,6 +12,8 @@ interface UserMenuProps {
 }
 
 export const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, onNavigate }) => {
+    const { currentUser } = useUser();
+
     if (!isOpen) return null;
 
     const menuItems = [
@@ -17,6 +22,24 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, onNavigate 
         { id: 'myClasses' as MenuPage, label: 'أقسامي', icon: Users, description: 'الأقسام الدراسية' },
         { id: 'systemSettings' as MenuPage, label: 'إعدادات النظام', icon: Cog, description: 'الإعدادات والتفضيلات' },
     ];
+
+    if (can(currentUser, 'users.manage')) {
+        menuItems.push({
+            id: 'usersManagement' as MenuPage,
+            label: 'إدارة المستخدمين',
+            icon: Users,
+            description: 'الصلاحيات والحسابات'
+        });
+    }
+
+    if (can(currentUser, 'reports.view.school')) {
+        menuItems.push({
+            id: 'adminDashboard' as MenuPage,
+            label: 'لوحة التحكم',
+            icon: Cog, // We can replace with LayoutDashboard if available
+            description: 'إحصائيات الإدارة'
+        });
+    }
 
     return (
         <>

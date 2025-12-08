@@ -176,20 +176,6 @@ export function ReportDetailsModal({ isOpen, onClose, onEdit, report }: ReportDe
                     )}
                 </div>
 
-interface ReportDetailsModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onEdit: (uid: string) => void;
-    report: ReportData | null;
-}
-
-// ... existing code ...
-
-export function ReportDetailsModal({ isOpen, onClose, onEdit, report }: ReportDetailsModalProps) {
-    if (!isOpen || !report) return null;
-
-// ... existing render code ...
-
                 {/* Footer */}
                 <div className="p-4 border-t bg-gray-50 flex gap-3">
                     <button

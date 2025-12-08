@@ -1,0 +1,3 @@
+﻿teacher_code,teacher_name,national_id,phone,email,school_code,_template_version
+حقل فريد (TCH001...) - مطلوب,الاسم الكامل بالعربية - مطلوب,رقم الهوية الوطنية - اختياري,رقم الجوال - اختياري,البريد الإلكتروني - اختياري,رمز المدرسة - مطلوب,1
+TCH001,أحمد بن محمد العلي,1010101010,0550000000,teacher@example.com,SCH001,1

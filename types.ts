@@ -54,9 +54,38 @@ export interface ListData {
 export type TabId = 'dailyReport' | 'notes' | 'statistics';
 
 // User Menu Pages (accessed via avatar click)
-export type MenuPage = 'myAccount' | 'generalData' | 'myClasses' | 'systemSettings' | null;
+export type MenuPage = 'myAccount' | 'generalData' | 'myClasses' | 'systemSettings' | 'usersManagement' | 'adminDashboard' | 'organizationPortal' | 'ownerDashboard' | 'importCenter' | null;
 
 export type CompletionStatus = 'complete' | 'partial' | 'incomplete';
+
+// --- Phase 6: Users & RBAC ---
+export type Role = "teacher" | "school_admin" | "inspector" | "super_admin";
+
+export interface User {
+    id: string;               // UUID (Local System ID)
+    teacher_id?: string;      // Linked Teacher Registration ID (Read-only from sheets)
+    name: string;             // Display Name (Read-only from sheets)
+    email?: string;           // Optional link
+    school_id?: string;
+    roles: Role[];            // ['teacher'] default
+    sections?: string[];      // Associated sections
+    device_fingerprint?: string; 
+    linked_at?: number | null;
+    must_link_email?: boolean;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface LogEntry {
+    id: string;
+    event: string;
+    userId: string;
+    details?: any;
+    timestamp: number;
+}
+
+// See db.service.ts for SyncItem
+
 
 // Dashboard Statistics Types
 export interface LessonWithMonth {

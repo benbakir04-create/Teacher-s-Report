@@ -14,6 +14,8 @@ import {
     clearTeacherData,
     TeacherData
 } from './teacherService';
+import { dbService } from './db.service';
+import { User, Role } from '../types';
 
 export interface AuthSession {
     teacher: TeacherData;
@@ -114,6 +116,43 @@ export async function loginWithRegistrationId(registrationId: string): Promise<A
         
         // Save to local storage
         saveTeacherToLocal(teacher);
+
+        // --- Phase 6: User Onboarding (Sync with IndexedDB) ---
+        try {
+            const existingUser = await dbService.getUserByTeacherId(teacher.registrationId);
+            if (!existingUser) {
+                // Create New User
+                const newUser: User = {
+                    id: crypto.randomUUID(),
+                    teacher_id: teacher.registrationId,
+                    name: teacher.name,
+                    email: teacher.email || undefined,
+                    school_id: teacher.school,
+                    roles: ['teacher'] as Role[],
+                    sections: teacher.section ? [teacher.section] : [],
+                    device_fingerprint: currentFingerprint,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    must_link_email: false,
+                    linked_at: teacher.linkDate ? new Date(teacher.linkDate).getTime() : null
+                };
+                
+                await dbService.createUser(newUser);
+                
+                await dbService.logEvent({
+                    id: crypto.randomUUID(),
+                    event: 'user.create',
+                    userId: newUser.id,
+                    timestamp: Date.now(),
+                    details: { method: 'registration_id' }
+                });
+                console.log('✅ New User onboarded:', newUser.id);
+            }
+        } catch (err) {
+            console.error('⚠️ Failed to sync user to DB:', err);
+            // We don't block login if DB fails, as we rely on Local-First principle primarily
+        }
+        // -----------------------------------------------------
         
         // Determine if needs email link reminder
         const needsEmailLink = !isLinked && (
@@ -168,6 +207,30 @@ export async function linkWithGoogleEmail(googleUser: any): Promise<void> {
     teacher.linkDate = new Date().toISOString();
     saveTeacherToLocal(teacher);
     
+    // --- Phase 6: Sync Link to DB ---
+    try {
+        const user = await dbService.getUserByTeacherId(teacher.registrationId);
+        if (user) {
+            user.email = email;
+            user.device_fingerprint = deviceData.fingerprint;
+            user.linked_at = Date.now();
+            user.updatedAt = Date.now();
+            await dbService.updateUser(user);
+            
+            await dbService.logEvent({
+                id: crypto.randomUUID(),
+                event: 'user.link_email',
+                userId: user.id,
+                timestamp: Date.now(),
+                details: { email }
+            });
+            console.log('✅ User email linked in DB');
+        }
+    } catch (e) {
+        console.error('Failed to sync email link to DB:', e);
+    }
+    // --------------------------------
+
     // Save last reminder dismiss date
     localStorage.setItem('last_reminder_dismiss', new Date().toDateString());
 }

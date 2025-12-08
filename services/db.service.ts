@@ -11,6 +11,7 @@ export interface StoredReport {
     data: any;
     classId?: string; // Indexable
     date?: string;    // Indexable
+    owner_user_id?: string; // Linked User ID
     createdAt: number;
     updatedAt?: number;
     status: 'submitted';
@@ -37,13 +38,15 @@ export interface GeneralData {
 }
 
 const DB_NAME = 'teacher-report-db';
-const DB_VERSION = 3; // Upgraded to 3 for Drafts
+const DB_VERSION = 4; // Upgraded to 4 for Users/Logs
 const STORES = {
     REPORTS: 'reports',
-    DRAFTS: 'drafts', // New Store
+    DRAFTS: 'drafts',
     SYNC_QUEUE: 'syncQueue',
     SETTINGS: 'settings',
-    CONFIG: 'config'
+    CONFIG: 'config',
+    USERS: 'users',      // New Phase 6
+    LOGS: 'logs'         // New Phase 6
 };
 
 class DBService {
@@ -67,7 +70,7 @@ class DBService {
 
             request.onsuccess = (event) => {
                 this.db = (event.target as IDBOpenDBRequest).result;
-                console.log('✅ IndexedDB initialized (v3)');
+                console.log('✅ IndexedDB initialized (v4)');
                 resolve();
             };
 
@@ -77,28 +80,28 @@ class DBService {
                 // 1. Reports Store
                 if (!db.objectStoreNames.contains(STORES.REPORTS)) {
                     const reportStore = db.createObjectStore(STORES.REPORTS, { keyPath: 'id' });
-                    // Add indexes for efficient querying
                     reportStore.createIndex('classId', 'classId', { unique: false });
                     reportStore.createIndex('date', 'date', { unique: false });
+                    reportStore.createIndex('owner', 'owner_user_id', { unique: false }); // New Index
                 } else {
-                    // If migrating from v2, add indexes if missing
                     const reportStore = (event.target as IDBOpenDBRequest).transaction!.objectStore(STORES.REPORTS);
                     if (!reportStore.indexNames.contains('classId')) {
-                         // We might need to migrate data structure here if existing data doesn't have classId at top level
-                         // For now simply creating index. Logic application will handle filling it.
                          reportStore.createIndex('classId', 'data.general.sectionId', { unique: false }); 
                     }
                     if (!reportStore.indexNames.contains('date')) {
                         reportStore.createIndex('date', 'data.general.date', { unique: false });
                     }
+                    if (!reportStore.indexNames.contains('owner')) {
+                        reportStore.createIndex('owner', 'owner_user_id', { unique: false });
+                    }
                 }
 
-                // 2. Drafts Store (New)
+                // 2. Drafts Store
                 if (!db.objectStoreNames.contains(STORES.DRAFTS)) {
                     const draftStore = db.createObjectStore(STORES.DRAFTS, { keyPath: 'id' });
                     draftStore.createIndex('classId', 'classId', { unique: false });
                     draftStore.createIndex('date', 'date', { unique: false });
-                    draftStore.createIndex('lookupKey', ['classId', 'date'], { unique: false }); // Composite helper
+                    draftStore.createIndex('lookupKey', ['classId', 'date'], { unique: false });
                 }
 
                 // 3. Sync Queue
@@ -114,6 +117,20 @@ class DBService {
                 // 5. Config
                 if (!db.objectStoreNames.contains(STORES.CONFIG)) {
                     db.createObjectStore(STORES.CONFIG, { keyPath: 'key' });
+                }
+
+                // 6. Users Store (New Phase 6)
+                if (!db.objectStoreNames.contains(STORES.USERS)) {
+                    const userStore = db.createObjectStore(STORES.USERS, { keyPath: 'id' });
+                    userStore.createIndex('teacher_id', 'teacher_id', { unique: true }); // Teacher ID must be unique
+                    userStore.createIndex('email', 'email', { unique: true });
+                }
+
+                // 7. Logs Store (New Phase 6)
+                if (!db.objectStoreNames.contains(STORES.LOGS)) {
+                    const logStore = db.createObjectStore(STORES.LOGS, { keyPath: 'id' });
+                    logStore.createIndex('userId', 'userId', { unique: false });
+                    logStore.createIndex('date', 'timestamp', { unique: false });
                 }
             };
         });
@@ -166,11 +183,22 @@ class DBService {
 
     async saveReport(report: any): Promise<void> {
         const id = report.uid || Date.now().toString();
+        
+        // --- Lookup Owner (Phase 6) ---
+        let ownerId = report.owner_user_id;
+        if (!ownerId && report.general?.id) {
+            try {
+                const user = await this.getUserByTeacherId(report.general.id);
+                if (user) ownerId = user.id;
+            } catch (e) { /* ignore */ }
+        }
+        
         const storedReport: StoredReport = {
             id: id,
-            data: report,
+            data: { ...report, owner_user_id: ownerId }, // Also inject into data blob for ease
             classId: report.general?.sectionId,
             date: report.general?.date,
+            owner_user_id: ownerId,
             createdAt: report.createdAt || Date.now(),
             updatedAt: Date.now(),
             status: 'submitted'
@@ -282,6 +310,52 @@ class DBService {
             };
             request.onerror = () => reject(request.error);
         });
+    }
+
+
+    // --- USERS APIs (Phase 6) ---
+
+    async createUser(user: any): Promise<void> {
+        await this.add(STORES.USERS, user);
+    }
+
+    async getUser(id: string): Promise<any | null> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.USERS], 'readonly');
+            const store = transaction.objectStore(STORES.USERS);
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getUserByTeacherId(teacherId: string): Promise<any | null> {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORES.USERS], 'readonly');
+            const store = transaction.objectStore(STORES.USERS);
+            const index = store.index('teacher_id'); // Ensure index exists
+            const request = index.get(teacherId);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async updateUser(user: any): Promise<void> {
+        await this.add(STORES.USERS, user); // put overwrites
+    }
+
+    // --- LOGS APIs (Phase 6) ---
+
+    async logEvent(entry: any): Promise<void> {
+        await this.add(STORES.LOGS, entry);
+    }
+
+    async getLogs(limit: number = 50): Promise<any[]> {
+        // For simple usage, get all and sort. For millions of logs, use cursor or IDB KeyRange.
+        const all = await this.getAll<any>(STORES.LOGS);
+        return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
     }
 }
 

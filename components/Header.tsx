@@ -1,5 +1,6 @@
 import React from 'react';
 import { Bell, User, QrCode } from 'lucide-react';
+import { SyncStatus } from './SyncStatus';
 
 interface HeaderProps {
     teacherName: string;
@@ -31,7 +32,8 @@ export const Header: React.FC<HeaderProps> = ({ teacherName, userImage, onQrClic
                 </div>
 
                 {/* Left Side: Actions */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                    <SyncStatus compact />
                     <button 
                         onClick={onQrClick}
                         className="p-2 bg-white/20 rounded-full backdrop-blur-sm hover:bg-white/30 transition"

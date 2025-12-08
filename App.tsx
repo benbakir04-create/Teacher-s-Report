@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { AboutProject } from './components/AboutProject';
-import { Dashboard } from './Dashboard';
 import { LoginScreen } from './components/LoginScreen';
 import { EmailLinkModal } from './components/EmailLinkModal';
 import { AccountModal } from './components/AccountModal';
@@ -15,10 +14,17 @@ import { GeneralDataPage } from './pages/GeneralDataPage';
 import { MyClassesPage } from './pages/MyClassesPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
 import { DailyReportPage } from './pages/DailyReportPage';
-
+import { StatisticsPage } from './pages/StatisticsPage';
+import { UsersManagementPage } from './pages/admin/UsersManagementPage';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+import { OrganizationPortal } from './pages/organization/OrganizationPortal';
+import { OwnerDashboard } from './pages/organization/OwnerDashboard';
+import { ImportCenter } from './pages/organization/ImportCenter';
+import { AdminRoute } from './components/AdminRoute';
 import { MessageSquare, WifiOff, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
+import { dbService } from './services/db.service';
 
 // Custom Hooks
 import { useAuth } from './hooks/useAuth';
@@ -81,6 +87,22 @@ export default function App() {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [currentMenuPage, setCurrentMenuPage] = useState<MenuPage>(null);
     const [activeSubTab, setActiveSubTab] = useState<'form' | 'list'>('form');
+
+    // Archive State
+    const [archive, setArchive] = useState<any[]>([]);
+
+    // Load Archive on Mount
+    useEffect(() => {
+        const loadArchive = async () => {
+             try {
+                const reports = await dbService.getAllReports();
+                setArchive(reports);
+            } catch (error) {
+                console.error("Failed to load archive", error);
+            }
+        };
+        loadArchive();
+    }, []);
 
     // Sync Auth with Report
     useEffect(() => {
@@ -242,11 +264,34 @@ export default function App() {
                 {currentMenuPage === 'generalData' && <GeneralDataPage />}
                 {currentMenuPage === 'myClasses' && <MyClassesPage />}
                 {currentMenuPage === 'systemSettings' && <SystemSettingsPage />}
+                {currentMenuPage === 'usersManagement' && (
+                    <AdminRoute requiredPermission='users.manage'>
+                        <UsersManagementPage />
+                    </AdminRoute>
+                )}
+                {currentMenuPage === 'adminDashboard' && (
+                    <AdminRoute requiredPermission='reports.view.school'>
+                        <AdminDashboardPage />
+                    </AdminRoute>
+                )}
+                {currentMenuPage === 'organizationPortal' && (
+                    <OrganizationPortal onComplete={() => setCurrentMenuPage('ownerDashboard')} />
+                )}
+                {currentMenuPage === 'ownerDashboard' && (
+                    <AdminRoute requiredPermission='reports.view.school'>
+                        <OwnerDashboard />
+                    </AdminRoute>
+                )}
+                {currentMenuPage === 'importCenter' && (
+                    <AdminRoute requiredPermission='reports.view.school'>
+                        <ImportCenter />
+                    </AdminRoute>
+                )}
                 
                 {/* Tab Content (only show if no menu page is open) */}
                 {!currentMenuPage && (
                     <>
-                        {activeTab === 'dailyReport' && (
+                        {activeTab === 'dailyReport' && appData && (
                             <DailyReportPage 
                                 report={report}
                                 setReport={setReport}
@@ -262,6 +307,7 @@ export default function App() {
                                 handleClassChange={handleClassChange}
                                 activeSubTab={activeSubTab}
                                 setActiveSubTab={setActiveSubTab}
+                                archive={archive}
                             />
                         )}
                         
@@ -279,7 +325,7 @@ export default function App() {
                             </div>
                         )}
 
-                        {activeTab === 'statistics' && <Dashboard stats={statsData} />}
+                        {activeTab === 'statistics' && <StatisticsPage />}
                     </>
                 )}
             </div>

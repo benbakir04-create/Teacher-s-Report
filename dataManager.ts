@@ -37,19 +37,33 @@ export async function loadData(): Promise<ListData> {
   try {
     const sheetsData = await loadAllData();
     
-    // تحويل البيانات من Sheets إلى تنسيق ListData
-    cachedData = {
-      schools: sheetsData.config.schools || MOCK_DATA.schools,
-      levels: sheetsData.config.levels || MOCK_DATA.levels,
-      sections: sheetsData.config.sections || MOCK_DATA.sections,
-      subjects: sheetsData.subjects || MOCK_DATA.subjects,
-      lessons: transformLessons(sheetsData.lessons) || MOCK_DATA.lessons,
-      strategies: sheetsData.config.strategies || MOCK_DATA.strategies,
-      tools: sheetsData.config.tools || MOCK_DATA.tools,
-      tasks: sheetsData.config.tasks || MOCK_DATA.tasks
+    // Helper function to use data only if array has items
+    const useIfNotEmpty = <T>(sheetData: T[], fallback: T[]): T[] => {
+      return sheetData && sheetData.length > 0 ? sheetData : fallback;
     };
     
-    console.log('Data loaded from Google Sheets successfully');
+    // تحويل البيانات من Sheets إلى تنسيق ListData
+    cachedData = {
+      schools: useIfNotEmpty(sheetsData.config.schools, MOCK_DATA.schools),
+      levels: useIfNotEmpty(sheetsData.config.levels, MOCK_DATA.levels),
+      sections: useIfNotEmpty(sheetsData.config.sections, MOCK_DATA.sections),
+      subjects: Object.keys(sheetsData.lessons || {}).length > 0 
+        ? MOCK_DATA.subjects  // sheetsData.subjects is string[], ListData expects object
+        : MOCK_DATA.subjects,
+      lessons: Object.keys(sheetsData.lessons || {}).length > 0 
+        ? transformLessons(sheetsData.lessons) 
+        : MOCK_DATA.lessons,
+      strategies: useIfNotEmpty(sheetsData.config.strategies, MOCK_DATA.strategies),
+      tools: useIfNotEmpty(sheetsData.config.tools, MOCK_DATA.tools),
+      tasks: useIfNotEmpty(sheetsData.config.tasks, MOCK_DATA.tasks)
+    };
+    
+    console.log('Data loaded:', {
+      schools: cachedData.schools.length,
+      levels: cachedData.levels.length,
+      sections: cachedData.sections.length,
+      subjects: Object.keys(cachedData.subjects).length
+    });
     return cachedData;
     
   } catch (error) {

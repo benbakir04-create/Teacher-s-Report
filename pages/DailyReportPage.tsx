@@ -23,10 +23,11 @@ interface DailyReportPageProps {
     setPendingCount: React.Dispatch<React.SetStateAction<number>>;
     dateInputType: 'text' | 'date';
     setDateInputType: React.Dispatch<React.SetStateAction<'text' | 'date'>>;
-    handleGeneralChange: (field: keyof typeof report.general, value: string) => void;
+    handleGeneralChange: (field: keyof ReportData['general'], value: string) => void;
     handleClassChange: (classType: 'firstClass' | 'secondClass', field: keyof ClassData, value: any) => void;
     activeSubTab: 'form' | 'list';
     setActiveSubTab: (tab: 'form' | 'list') => void;
+    archive: ArchivedReport[];
 }
 
 // Helper to format date
@@ -44,7 +45,7 @@ export function DailyReportPage({
     report, setReport, appData, availableSubjects,
     loadFromHistory, saveToArchive, online, setPendingCount,
     dateInputType, setDateInputType, handleGeneralChange, handleClassChange,
-    activeSubTab, setActiveSubTab
+    activeSubTab, setActiveSubTab, archive
 }: DailyReportPageProps) {
     const [openAccordion, setOpenAccordion] = useState<string | null>('strategies');
     const [selectedReportUid, setSelectedReportUid] = useState<string | null>(null);

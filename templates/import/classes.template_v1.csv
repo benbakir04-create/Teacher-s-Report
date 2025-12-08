@@ -1,0 +1,3 @@
+﻿class_code,school_code,grade,division,capacity,_template_version
+حقل فريد (CLS-SCH001-1A) - مطلوب,رمز المدرسة (راجع ورقة school_codes) - مطلوب,الصف - مطلوب,الشعبة (أ، ب، ج...) - مطلوب,السعة القصوى - اختياري,1
+CLS-SCH001-1A,SCH001,الخامس,أ,30,1
